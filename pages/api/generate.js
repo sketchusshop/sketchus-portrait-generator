@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 
 export const config = { api: { bodyParser: { sizeLimit: '20mb' } } };
 
@@ -8,19 +8,16 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-    const { imageBase64, mimeType } = req.body;
+    const { imageBase64 } = req.body;
 
     if (!imageBase64) {
       return res.status(400).json({ error: 'Kein Bild empfangen' });
     }
 
-    // Resize ảnh về max 1024px trước khi gửi
     const buffer = Buffer.from(imageBase64, 'base64');
-    const ext = mimeType === 'image/png' ? 'png' : 'jpg';
-    const imageFile = new File([buffer], `photo.${ext}`, { type: 'image/jpeg' });
 
-    console.log('File size:', buffer.length, 'bytes');
-    console.log('MIME type:', mimeType);
+    // Dùng toFile() từ OpenAI SDK — giữ đúng MIME type
+    const imageFile = await toFile(buffer, 'photo.jpg', { type: 'image/jpeg' });
 
     const response = await openai.images.edit({
       model: 'gpt-image-1',
@@ -35,7 +32,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ imageUrl });
   } catch (e) {
-    console.error('Full error:', JSON.stringify(e, null, 2));
-    res.status(500).json({ error: 'OpenAI Fehler: ' + (e.message || JSON.stringify(e)) });
+    console.error('Error:', e);
+    res.status(500).json({ error: 'OpenAI Fehler: ' + e.message });
   }
 }
