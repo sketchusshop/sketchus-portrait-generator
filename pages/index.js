@@ -1,8 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Cropper from 'react-easy-crop';
 
-// A4 ngang tỉ lệ: 297/210 = 1.4142
 const A4_RATIO = 297 / 210;
+
+const LOADING_STEPS = [
+  'Details werden analysiert',
+  'Skizze wird erstellt',
+  'Komposition wird optimiert',
+  'Finalisierung',
+];
 
 function getCroppedImg(imageSrc, croppedAreaPixels) {
   return new Promise((resolve) => {
@@ -27,7 +33,6 @@ function getCroppedImg(imageSrc, croppedAreaPixels) {
   });
 }
 
-// Crop ảnh kết quả về đúng tỉ lệ A4 ngang
 function cropToA4(imageSrc) {
   return new Promise((resolve) => {
     const image = new Image();
@@ -37,21 +42,17 @@ function cropToA4(imageSrc) {
       const srcW = image.width;
       const srcH = image.height;
       let cropW, cropH, offsetX, offsetY;
-
       if (srcW / srcH > A4_RATIO) {
-        // Ảnh rộng hơn A4 → crop chiều ngang
         cropH = srcH;
         cropW = Math.round(srcH * A4_RATIO);
         offsetX = Math.round((srcW - cropW) / 2);
         offsetY = 0;
       } else {
-        // Ảnh cao hơn A4 → crop chiều dọc
         cropW = srcW;
         cropH = Math.round(srcW / A4_RATIO);
         offsetX = 0;
         offsetY = Math.round((srcH - cropH) / 2);
       }
-
       const canvas = document.createElement('canvas');
       canvas.width = cropW;
       canvas.height = cropH;
@@ -68,6 +69,83 @@ function blobToBase64(blob) {
     reader.onloadend = () => resolve(reader.result.split(',')[1]);
     reader.readAsDataURL(blob);
   });
+}
+
+function LoadingOverlay({ bgImage }) {
+  const [progress, setProgress] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    // Progress bar: 90 giây tổng (AI thường mất 30-60s)
+    const totalMs = 55000;
+    const interval = 200;
+    const increment = (interval / totalMs) * 100;
+
+    const timer = setInterval(() => {
+      setProgress(prev => {
+        const next = Math.min(prev + increment, 95);
+        // Cập nhật step dựa theo progress
+        if (next < 25) setStepIndex(0);
+        else if (next < 55) setStepIndex(1);
+        else if (next < 80) setStepIndex(2);
+        else setStepIndex(3);
+        return next;
+      });
+    }, interval);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div style={overlay.backdrop}>
+      {/* Blurred background image */}
+      {bgImage && (
+        <div style={{
+          ...overlay.bgImg,
+          backgroundImage: `url(${bgImage})`,
+        }} />
+      )}
+      <div style={overlay.box}>
+        <p style={overlay.topLabel}>WIR ERSTELLEN DEIN KUNSTWERK</p>
+        <h2 style={overlay.title}>{LOADING_STEPS[stepIndex]}...</h2>
+
+        {/* Progress bar */}
+        <div style={overlay.barTrack}>
+          <div style={{ ...overlay.barFill, width: `${progress}%` }} />
+        </div>
+
+        {/* Steps */}
+        <div style={overlay.steps}>
+          {LOADING_STEPS.map((step, i) => (
+            <div key={i} style={overlay.stepRow}>
+              <span style={{
+                ...overlay.stepIcon,
+                color: i < stepIndex ? '#fff' : i === stepIndex ? '#f0c040' : '#666',
+              }}>
+                {i < stepIndex ? '✓' : i === stepIndex ? '●' : '○'}
+              </span>
+              <span style={{
+                ...overlay.stepText,
+                color: i < stepIndex ? '#ccc' : i === stepIndex ? '#fff' : '#555',
+                fontWeight: i === stepIndex ? 'bold' : 'normal',
+              }}>
+                {step}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Upsell text */}
+        <div style={overlay.upsell}>
+          <p style={overlay.upsellText}>
+            Dieser Entwurf wird automatisch aus 1 Foto erstellt.<br />
+            <strong>Mehrere Vorlagen?</strong> Dann lass echte Künstler dein{' '}
+<span style={{ color: '#f0c040' }}>handgezeichnetes Portrait</span> erstellen.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Home() {
@@ -120,12 +198,10 @@ export default function Home() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+        body: JSON.stringify({ imageBase64: base64 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Fehler');
-
-      // Crop kết quả về đúng tỉ lệ A4 ngang
       const a4Image = await cropToA4(data.imageUrl);
       setResult(a4Image);
       setCount(c => c + 1);
@@ -138,6 +214,8 @@ export default function Home() {
 
   return (
     <div style={styles.container}>
+      {loading && <LoadingOverlay bgImage={croppedPreview} />}
+
       <div style={styles.card}>
         <h1 style={styles.title}>✏️ Bleistift-Portrait Generator</h1>
         <p style={styles.subtitle}>Lade dein Foto hoch und erhalte ein künstlerisches Bleistift-Portrait</p>
@@ -247,4 +325,20 @@ const styles = {
   modalButtons: { display: 'flex', gap: 12, justifyContent: 'flex-end' },
   cancelBtn: { padding: '10px 24px', background: 'transparent', border: '1px solid #555', color: '#aaa', borderRadius: 8, cursor: 'pointer', fontSize: 16 },
   saveBtn: { padding: '10px 24px', background: '#f0c040', color: '#1a1a2e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 16, fontWeight: 'bold' },
+};
+
+const overlay = {
+  backdrop: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  bgImg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(12px) brightness(0.4)', transform: 'scale(1.1)' },
+  box: { position: 'relative', zIndex: 1, background: 'rgba(22,33,62,0.85)', borderRadius: 20, padding: '40px 48px', maxWidth: 480, width: '90%', textAlign: 'center', backdropFilter: 'blur(8px)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' },
+  topLabel: { fontSize: 11, letterSpacing: 3, color: '#888', textTransform: 'uppercase', marginBottom: 12 },
+  title: { fontSize: 26, fontWeight: 'bold', color: '#fff', marginBottom: 24, fontFamily: 'Georgia, serif' },
+  barTrack: { background: '#333', borderRadius: 99, height: 6, marginBottom: 28, overflow: 'hidden' },
+  barFill: { height: '100%', background: 'linear-gradient(90deg, #f0c040, #e63946)', borderRadius: 99, transition: 'width 0.2s ease' },
+  steps: { textAlign: 'left', marginBottom: 28 },
+  stepRow: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 },
+  stepIcon: { fontSize: 16, width: 20, textAlign: 'center', flexShrink: 0 },
+  stepText: { fontSize: 15 },
+  upsell: { borderTop: '1px solid #333', paddingTop: 20 },
+  upsellText: { fontSize: 13, color: '#aaa', lineHeight: 1.6 },
 };
