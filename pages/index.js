@@ -181,16 +181,6 @@ export default function Home() {
     resultImg: { width: '100%', borderRadius: 4, display: 'block', marginBottom: 14 },
     buyBtn: { display: 'block', padding: '14px 0', background: C.buyBtn, color: C.buyBtnText, borderRadius: R.btn, textAlign: 'center', textDecoration: 'none', fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
     upsellNote: { textAlign: 'center', fontSize: 13, color: C.textDim, lineHeight: 1.5 },
-    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#000', display: 'flex', flexDirection: 'column', zIndex: 1000 },
-    modalHeader: { padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: '#1a1a1a' },
-    cropContainer: { position: 'relative', flex: 1, overflow: 'hidden' },
-    modalFooter: { padding: '12px 16px', background: '#1a1a1a', flexShrink: 0 },
-    sliderWrapper: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 },
-    sliderLabel: { fontSize: 13, color: '#aaa', whiteSpace: 'nowrap' },
-    slider: { flex: 1, accentColor: '#fff' },
-    modalButtons: { display: 'flex', gap: 10 },
-    cancelBtn: { flex: 1, padding: '12px 0', background: 'transparent', border: '1px solid #555', color: '#aaa', borderRadius: R.btn, cursor: 'pointer', fontSize: 15 },
-    saveBtn: { flex: 1, padding: '12px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: R.btn, cursor: 'pointer', fontSize: 15, fontWeight: 'bold' },
   };
 
   return (
@@ -252,27 +242,47 @@ export default function Home() {
         </div>
       )}
 
-      {/* Crop Modal — full screen */}
+      {/* Crop Modal — cùng màu nền #636363, crop nhỏ lại tránh icon */}
       {showCropModal && (
-        <div style={s.modalOverlay}>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: C.pageBg, // cùng màu nền #636363
+          display: 'flex', flexDirection: 'column', zIndex: 1000,
+        }}>
           {/* Header */}
-          <div style={s.modalHeader}>
-            <span style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>{t.cropTitle}</span>
-            {/* 1 nút nhỏ toggle ngang/dọc */}
+          <div style={{
+            padding: '12px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            flexShrink: 0,
+          }}>
+            <span style={{ color: C.text, fontSize: 15, fontWeight: 'bold' }}>{t.cropTitle}</span>
             <button
               onClick={() => {
                 setOrientation(o => o === 'landscape' ? 'portrait' : 'landscape');
                 setCrop({ x: 0, y: 0 });
                 setZoom(1);
               }}
-              style={{ padding: '5px 12px', fontSize: 12, background: 'transparent', color: '#aaa', border: '1px solid #555', borderRadius: 4, cursor: 'pointer' }}
+              style={{
+                padding: '5px 12px', fontSize: 12,
+                background: 'transparent', color: C.textMuted,
+                border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
+              }}
             >
               {orientation === 'landscape' ? '↕ Hochformat' : '↔ Querformat'}
             </button>
           </div>
 
-          {/* Crop area — chiếm toàn bộ màn hình còn lại */}
-          <div style={s.cropContainer}>
+          {/* Crop area — thu nhỏ lại, chừa chỗ cho nút bên dưới */}
+          <div style={{
+            position: 'relative',
+            // Tính toán: header ~50px + footer ~130px + safe area ~80px = 260px
+            height: 'calc(100vh - 260px)',
+            background: '#4a4a4a',
+            margin: '0 16px',
+            borderRadius: 8,
+            overflow: 'hidden',
+            flexShrink: 0,
+          }}>
             <Cropper
               image={rawPreview}
               crop={crop}
@@ -284,16 +294,41 @@ export default function Home() {
             />
           </div>
 
-          {/* Footer */}
-          <div style={s.modalFooter}>
-            <div style={s.sliderWrapper}>
-              <span style={s.sliderLabel}>{t.zoom}</span>
-              <input type="range" min={1} max={3} step={0.01} value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))} style={s.slider} />
+          {/* Footer — nút bấm luôn hiện, không bị che */}
+          <div style={{
+            padding: '16px 16px 32px', // padding bottom 32px tránh safe area iPhone
+            flexShrink: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <span style={{ fontSize: 13, color: C.textMuted, whiteSpace: 'nowrap' }}>{t.zoom}</span>
+              <input
+                type="range" min={1} max={3} step={0.01} value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                style={{ flex: 1, accentColor: '#fff' }}
+              />
             </div>
-            <div style={s.modalButtons}>
-              <button onClick={handleCancelCrop} style={s.cancelBtn}>{t.cropCancel}</button>
-              <button onClick={handleSaveCrop} style={s.saveBtn}>{t.cropSave}</button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={handleCancelCrop}
+                style={{
+                  flex: 1, padding: '14px 0',
+                  background: 'transparent', border: `1px solid ${C.border}`,
+                  color: C.textMuted, borderRadius: R.btn, cursor: 'pointer', fontSize: 15,
+                }}
+              >
+                {t.cropCancel}
+              </button>
+              <button
+                onClick={handleSaveCrop}
+                style={{
+                  flex: 1, padding: '14px 0',
+                  background: '#fff', color: '#1a1a1a',
+                  border: 'none', borderRadius: R.btn, cursor: 'pointer',
+                  fontSize: 15, fontWeight: 'bold',
+                }}
+              >
+                {t.cropSave}
+              </button>
             </div>
           </div>
         </div>
