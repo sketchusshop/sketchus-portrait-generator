@@ -10,6 +10,9 @@ const RATIOS = {
   portrait: 210 / 297,
 };
 
+const HISTORY_KEY = 'sketchus_portrait_history';
+const MAX_HISTORY = 5;
+
 function detectLang() {
   if (typeof window === 'undefined') return 'de';
   const urlLang = new URLSearchParams(window.location.search).get('lang');
@@ -18,6 +21,21 @@ function detectLang() {
   if (host.endsWith('.com') || host.endsWith('.co.uk') || host.endsWith('.us')) return 'en';
   if (host.endsWith('.de') || host.endsWith('.at') || host.endsWith('.ch')) return 'de';
   return navigator.language?.slice(0, 2) === 'de' ? 'de' : 'en';
+}
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch { return []; }
+}
+
+function saveToHistory(item) {
+  try {
+    const history = loadHistory();
+    history.unshift(item);
+    if (history.length > MAX_HISTORY) history.pop();
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch {}
 }
 
 function getCroppedImg(imageSrc, croppedAreaPixels) {
@@ -96,11 +114,51 @@ function LoadingOverlay({ bgImage, t }) {
   );
 }
 
+// Component hiện lịch sử ảnh đã tạo
+function HistoryPanel({ history, onSelect, onClose, t }) {
+  if (!history.length) return null;
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1500, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.pageBg }}>
+        <span style={{ color: C.text, fontWeight: 'bold', fontSize: 16 }}>
+          {t.historyTitle}
+        </span>
+        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textMuted, fontSize: 22, cursor: 'pointer', padding: '0 4px' }}>✕</button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: C.pageBg }}>
+        {history.map((item, i) => (
+          <div key={i} style={{ marginBottom: 16, borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+            <img src={item.imageUrl} alt={`Portrait ${i + 1}`} style={{ width: '100%', display: 'block' }} />
+            <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.2)' }}>
+              <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 8px' }}>{item.createdAt}</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => onSelect(item)}
+                  style={{ flex: 1, padding: '10px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: R.btn, fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  {t.historySelect}
+                </button>
+                <a
+                  href={item.checkoutUrl}
+                  style={{ flex: 1, padding: '10px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 14, textAlign: 'center', textDecoration: 'none', display: 'block' }}
+                >
+                  {t.buyBtn(SHOP_CONFIG.price)}
+                </a>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [lang] = useState(() => detectLang());
   const t = TRANSLATIONS[lang];
   const [rawPreview, setRawPreview] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [orientation, setOrientation] = useState('landscape');
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -112,7 +170,19 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [count, setCount] = useState(0);
+  const [history, setHistory] = useState([]);
   const MAX = SHOP_CONFIG.maxPreviewsPerDay;
+
+  // Load từ localStorage khi khởi động
+  useEffect(() => {
+    const h = loadHistory();
+    setHistory(h);
+    // Khôi phục ảnh mới nhất nếu có
+    if (h.length > 0) {
+      setResult(h[0].imageUrl);
+      setCheckoutUrl(h[0].checkoutUrl);
+    }
+  }, []);
 
   function handleUpload(e) {
     const file = e.target.files[0];
@@ -142,6 +212,15 @@ export default function Home() {
     setResult(null);
     setCheckoutUrl(null);
     setError(null);
+    setCroppedPreview(null);
+    setCroppedBlob(null);
+    setRawPreview(null);
+  }
+
+  function handleSelectFromHistory(item) {
+    setResult(item.imageUrl);
+    setCheckoutUrl(item.checkoutUrl);
+    setShowHistory(false);
   }
 
   async function handleGenerate() {
@@ -156,6 +235,18 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.errorGeneric);
+
+      const newItem = {
+        imageUrl: data.imageUrl,
+        checkoutUrl: data.checkoutUrl,
+        createdAt: new Date().toLocaleString('de-DE'),
+      };
+
+      // Lưu vào localStorage
+      saveToHistory(newItem);
+      const newHistory = loadHistory();
+      setHistory(newHistory);
+
       setResult(data.imageUrl);
       setCheckoutUrl(data.checkoutUrl);
       setCount(c => c + 1);
@@ -172,11 +263,11 @@ export default function Home() {
     subtitle: { color: C.textMuted, marginBottom: 4, fontSize: 13, textAlign: 'center', lineHeight: 1.5 },
     counter: { color: C.textDim, fontSize: 12, marginBottom: 16, textAlign: 'center' },
     uploadBox: { display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px dashed ${C.border}`, borderRadius: R.upload, padding: 16, cursor: 'pointer', marginBottom: 10, minHeight: 130, overflow: 'hidden' },
-    uploadPlaceholder: { textAlign: 'center', color: C.textDim },
     previewImg: { maxWidth: '100%', maxHeight: 180, borderRadius: 4 },
     reuploadBtn: { display: 'block', textAlign: 'center', color: C.textMuted, cursor: 'pointer', marginBottom: 12, fontSize: 13, textDecoration: 'underline' },
     btn: { width: '100%', padding: '14px 0', background: C.accent, color: C.accentText, border: 'none', borderRadius: R.btn, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginBottom: 10 },
     btnSecondary: { width: '100%', padding: '11px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 14, cursor: 'pointer', marginBottom: 10 },
+    btnHistory: { width: '100%', padding: '10px 0', background: 'transparent', color: C.textDim, border: `1px solid rgba(255,255,255,0.15)`, borderRadius: R.btn, fontSize: 13, cursor: 'pointer', marginBottom: 10 },
     error: { color: C.error, textAlign: 'center', fontSize: 13, marginBottom: 10 },
     resultImg: { width: '100%', borderRadius: 4, display: 'block', marginBottom: 14 },
     buyBtn: { display: 'block', padding: '14px 0', background: C.buyBtn, color: C.buyBtnText, borderRadius: R.btn, textAlign: 'center', textDecoration: 'none', fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
@@ -186,6 +277,15 @@ export default function Home() {
   return (
     <div style={s.container}>
       {loading && <LoadingOverlay bgImage={croppedPreview} t={t} />}
+
+      {showHistory && (
+        <HistoryPanel
+          history={history}
+          onSelect={handleSelectFromHistory}
+          onClose={() => setShowHistory(false)}
+          t={t}
+        />
+      )}
 
       <h1 style={s.title}>{t.title}</h1>
       <p style={s.subtitle}>{t.subtitle}</p>
@@ -197,7 +297,7 @@ export default function Home() {
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
             {croppedPreview
               ? <img src={croppedPreview} alt="Cropped" style={s.previewImg} />
-              : <div style={s.uploadPlaceholder}>
+              : <div style={{ textAlign: 'center', color: C.textDim }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
                   <p style={{ margin: 0, fontWeight: 'bold', color: C.textMuted }}>{t.upload}</p>
                   <p style={{ margin: '4px 0 0', fontSize: 12, color: C.textDim }}>{t.uploadHint}</p>
@@ -219,6 +319,13 @@ export default function Home() {
           >
             {loading ? t.generating : t.generate}
           </button>
+
+          {/* Nút xem lịch sử — chỉ hiện nếu có */}
+          {history.length > 0 && (
+            <button onClick={() => setShowHistory(true)} style={s.btnHistory}>
+              🕐 {t.historyBtn} ({history.length})
+            </button>
+          )}
         </>
       )}
 
@@ -229,10 +336,19 @@ export default function Home() {
         <div>
           <p style={{ color: C.textMuted, fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{t.resultLabel}</p>
           <img src={result} alt="Portrait" style={s.resultImg} />
+
           {checkoutUrl && (
             <a href={checkoutUrl} style={s.buyBtn}>{t.buyBtn(SHOP_CONFIG.price)}</a>
           )}
+
           <button onClick={handleReset} style={s.btnSecondary}>{t.regenerate}</button>
+
+          {history.length > 1 && (
+            <button onClick={() => setShowHistory(true)} style={s.btnHistory}>
+              🕐 {t.historyBtn} ({history.length})
+            </button>
+          )}
+
           <p style={s.upsellNote}>
             {t.upsellText}<br />
             <a href={SHOP_CONFIG.originalPortraitUrl} style={{ color: C.text, textDecoration: 'underline', fontWeight: 'bold' }}>
@@ -242,91 +358,38 @@ export default function Home() {
         </div>
       )}
 
-      {/* Crop Modal — cùng màu nền #636363, crop nhỏ lại tránh icon */}
+      {/* Crop Modal */}
       {showCropModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: C.pageBg, // cùng màu nền #636363
-          display: 'flex', flexDirection: 'column', zIndex: 1000,
-        }}>
-          {/* Header */}
-          <div style={{
-            padding: '12px 16px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            flexShrink: 0,
-          }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: C.pageBg, display: 'flex', flexDirection: 'column', zIndex: 1000 }}>
+          <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <span style={{ color: C.text, fontSize: 15, fontWeight: 'bold' }}>{t.cropTitle}</span>
             <button
-              onClick={() => {
-                setOrientation(o => o === 'landscape' ? 'portrait' : 'landscape');
-                setCrop({ x: 0, y: 0 });
-                setZoom(1);
-              }}
-              style={{
-                padding: '5px 12px', fontSize: 12,
-                background: 'transparent', color: C.textMuted,
-                border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
-              }}
+              onClick={() => { setOrientation(o => o === 'landscape' ? 'portrait' : 'landscape'); setCrop({ x: 0, y: 0 }); setZoom(1); }}
+              style={{ padding: '5px 12px', fontSize: 12, background: 'transparent', color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer' }}
             >
               {orientation === 'landscape' ? '↕ Hochformat' : '↔ Querformat'}
             </button>
           </div>
 
-          {/* Crop area — thu nhỏ lại, chừa chỗ cho nút bên dưới */}
-          <div style={{
-            position: 'relative',
-            // Tính toán: header ~50px + footer ~130px + safe area ~80px = 260px
-            height: 'calc(100vh - 260px)',
-            background: '#4a4a4a',
-            margin: '0 16px',
-            borderRadius: 8,
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}>
+          <div style={{ position: 'relative', height: 'calc(100vh - 200px)', background: '#4a4a4a', margin: '0 16px', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
             <Cropper
-              image={rawPreview}
-              crop={crop}
-              zoom={zoom}
+              image={rawPreview} crop={crop} zoom={zoom}
               aspect={RATIOS[orientation]}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={onCropComplete}
+              onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropComplete}
             />
           </div>
 
-          {/* Footer — nút bấm luôn hiện, không bị che */}
-          <div style={{
-            padding: '16px 16px 32px', // padding bottom 32px tránh safe area iPhone
-            flexShrink: 0,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+          <div style={{ padding: '14px 16px 40px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: C.textMuted, whiteSpace: 'nowrap' }}>{t.zoom}</span>
-              <input
-                type="range" min={1} max={3} step={0.01} value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))}
-                style={{ flex: 1, accentColor: '#fff' }}
-              />
+              <input type="range" min={1} max={3} step={0.01} value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))} style={{ flex: 1, accentColor: '#fff' }} />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={handleCancelCrop}
-                style={{
-                  flex: 1, padding: '14px 0',
-                  background: 'transparent', border: `1px solid ${C.border}`,
-                  color: C.textMuted, borderRadius: R.btn, cursor: 'pointer', fontSize: 15,
-                }}
-              >
+              <button onClick={handleCancelCrop} style={{ flex: 1, padding: '14px 0', background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: R.btn, cursor: 'pointer', fontSize: 15 }}>
                 {t.cropCancel}
               </button>
-              <button
-                onClick={handleSaveCrop}
-                style={{
-                  flex: 1, padding: '14px 0',
-                  background: '#fff', color: '#1a1a1a',
-                  border: 'none', borderRadius: R.btn, cursor: 'pointer',
-                  fontSize: 15, fontWeight: 'bold',
-                }}
-              >
+              <button onClick={handleSaveCrop} style={{ flex: 1, padding: '14px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: R.btn, cursor: 'pointer', fontSize: 15, fontWeight: 'bold' }}>
                 {t.cropSave}
               </button>
             </div>
