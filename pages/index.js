@@ -34,29 +34,6 @@ function getCroppedImg(imageSrc, croppedAreaPixels) {
   });
 }
 
-function cropToRatio(imageSrc, ratio) {
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.src = imageSrc;
-    image.onload = () => {
-      const srcW = image.width, srcH = image.height;
-      let cropW, cropH, offsetX, offsetY;
-      if (srcW / srcH > ratio) {
-        cropH = srcH; cropW = Math.round(srcH * ratio);
-        offsetX = Math.round((srcW - cropW) / 2); offsetY = 0;
-      } else {
-        cropW = srcW; cropH = Math.round(srcW / ratio);
-        offsetX = 0; offsetY = Math.round((srcH - cropH) / 2);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = cropW; canvas.height = cropH;
-      canvas.getContext('2d').drawImage(image, offsetX, offsetY, cropW, cropH, 0, 0, cropW, cropH);
-      resolve(canvas.toDataURL('image/png'));
-    };
-  });
-}
-
 function blobToBase64(blob) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -86,20 +63,20 @@ function LoadingOverlay({ bgImage, t }) {
   }, []);
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(74,74,74,0.97)' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,99,99,0.97)' }}>
       {bgImage && (
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(16px) brightness(0.2)', transform: 'scale(1.1)' }} />
       )}
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 420, width: '90%', textAlign: 'center', fontFamily: DESIGN.font }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 380, width: '90%', textAlign: 'center', fontFamily: DESIGN.font, padding: '0 16px' }}>
         <p style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: 'uppercase', marginBottom: 12 }}>{t.loadingHeadline}</p>
-        <h2 style={{ fontSize: 22, fontWeight: 'bold', color: C.text, marginBottom: 24 }}>{t.loadingSteps[stepIndex]}...</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 'bold', color: C.text, marginBottom: 24 }}>{t.loadingSteps[stepIndex]}...</h2>
         <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 28, overflow: 'hidden' }}>
           <div style={{ height: '100%', background: '#fff', borderRadius: 99, width: `${progress}%`, transition: 'width 0.2s ease' }} />
         </div>
         <div style={{ textAlign: 'left', marginBottom: 28 }}>
           {t.loadingSteps.map((step, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <span style={{ fontSize: 14, width: 20, textAlign: 'center', color: i < stepIndex ? '#fff' : i === stepIndex ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+              <span style={{ fontSize: 14, width: 20, textAlign: 'center', color: i <= stepIndex ? '#fff' : 'rgba(255,255,255,0.3)' }}>
                 {i < stepIndex ? '✓' : i === stepIndex ? '●' : '○'}
               </span>
               <span style={{ fontSize: 14, color: i < stepIndex ? C.textMuted : i === stepIndex ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: i === stepIndex ? 'bold' : 'normal' }}>
@@ -109,7 +86,7 @@ function LoadingOverlay({ bgImage, t }) {
           ))}
         </div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 20 }}>
-          <p style={{ fontSize: 13, color: C.textDim, lineHeight: 1.6 }}>{t.loadingUpsell('Sketchus')}</p>
+          <p style={{ fontSize: 13, color: C.textDim, lineHeight: 1.6 }}>{t.loadingUpsell()}</p>
         </div>
       </div>
     </div>
@@ -157,6 +134,13 @@ export default function Home() {
     if (!croppedPreview) setRawPreview(null);
   }
 
+  // Nút "Nochmal erstellen" — reset chỉ result, giữ ảnh gốc
+  function handleReset() {
+    setResult(null);
+    setCheckoutUrl(null);
+    setError(null);
+  }
+
   async function handleGenerate() {
     if (!croppedBlob || count >= MAX) return;
     setLoading(true); setError(null);
@@ -169,8 +153,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.errorGeneric);
-      const a4Image = await cropToRatio(data.imageUrl, SHOP_CONFIG.imageAspectRatio);
-      setResult(a4Image);
+      setResult(data.imageUrl);  // Hiện ảnh trực tiếp, không crop A4
       setCheckoutUrl(data.checkoutUrl);
       setCount(c => c + 1);
     } catch (err) {
@@ -180,63 +163,31 @@ export default function Home() {
     }
   }
 
-  // Styles — tràn viền, không có card
   const s = {
-    container: {
-      minHeight: '100vh',
-      background: C.pageBg,
-      padding: '32px 24px',
-      fontFamily: DESIGN.font,
-      color: C.text,
-      boxSizing: 'border-box',
-    },
-    title: { fontSize: 24, fontWeight: 'bold', color: C.text, marginBottom: 6, textAlign: 'center' },
-    subtitle: { color: C.textMuted, marginBottom: 6, fontSize: 14, textAlign: 'center' },
-    counter: { color: C.textDim, fontSize: 13, marginBottom: 24, textAlign: 'center' },
-    uploadBox: {
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      border: `2px dashed ${C.border}`, borderRadius: R.upload,
-      padding: 20, cursor: 'pointer', marginBottom: 12, minHeight: 160, overflow: 'hidden',
-    },
+    container: { minHeight: '100vh', background: C.pageBg, padding: '24px 16px', fontFamily: DESIGN.font, color: C.text, boxSizing: 'border-box' },
+    title: { fontSize: 22, fontWeight: 'bold', color: C.text, marginBottom: 6, textAlign: 'center' },
+    subtitle: { color: C.textMuted, marginBottom: 6, fontSize: 13, textAlign: 'center', lineHeight: 1.5 },
+    counter: { color: C.textDim, fontSize: 12, marginBottom: 20, textAlign: 'center' },
+    uploadBox: { display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px dashed ${C.border}`, borderRadius: R.upload, padding: 16, cursor: 'pointer', marginBottom: 12, minHeight: 140, overflow: 'hidden' },
     uploadPlaceholder: { textAlign: 'center', color: C.textDim },
-    previewImg: { maxWidth: '100%', maxHeight: 220, borderRadius: 4 },
-    reuploadBtn: { display: 'block', textAlign: 'center', color: C.textMuted, cursor: 'pointer', marginBottom: 16, fontSize: 14, textDecoration: 'underline' },
-    btn: {
-      width: '100%', padding: '14px 0', background: C.accent, color: C.accentText,
-      border: 'none', borderRadius: R.btn, fontSize: 16, fontWeight: 'bold',
-      cursor: 'pointer', marginBottom: 16,
-    },
+    previewImg: { maxWidth: '100%', maxHeight: 200, borderRadius: 4 },
+    reuploadBtn: { display: 'block', textAlign: 'center', color: C.textMuted, cursor: 'pointer', marginBottom: 14, fontSize: 13, textDecoration: 'underline' },
+    btn: { width: '100%', padding: '14px 0', background: C.accent, color: C.accentText, border: 'none', borderRadius: R.btn, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginBottom: 12 },
+    btnSecondary: { width: '100%', padding: '12px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 15, fontWeight: 'normal', cursor: 'pointer', marginBottom: 12 },
     error: { color: C.error, textAlign: 'center', fontSize: 13, marginBottom: 12 },
-    resultLabel: { color: C.textMuted, fontSize: 13, marginBottom: 8 },
-    watermarkWrapper: { position: 'relative', display: 'inline-block', width: '100%' },
-    resultImg: { width: '100%', borderRadius: 4, display: 'block' },
-    watermark: {
-      position: 'absolute', top: '50%', left: '50%',
-      transform: 'translate(-50%,-50%) rotate(-30deg)',
-      fontSize: 32, color: 'rgba(255,255,255,0.35)', fontWeight: 'bold',
-      pointerEvents: 'none', whiteSpace: 'nowrap',
-    },
-    sizeNote: { color: C.textDim, fontSize: 12, textAlign: 'center', marginTop: 8, marginBottom: 16 },
-    buyBtn: {
-      display: 'block', padding: '14px 0', background: C.buyBtn, color: C.buyBtnText,
-      borderRadius: R.btn, textAlign: 'center', textDecoration: 'none',
-      fontSize: 16, fontWeight: 'bold', marginBottom: 12,
-    },
-    upsellNote: { textAlign: 'center', fontSize: 13, color: C.textDim },
-    modalOverlay: {
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.9)', display: 'flex',
-      alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-    },
-    modalBox: { background: '#3a3a3a', borderRadius: R.modal, padding: 24, width: '90%', maxWidth: 700, color: C.text },
-    modalTitle: { textAlign: 'center', marginBottom: 16, color: C.text, fontSize: 18 },
-    cropContainer: { position: 'relative', width: '100%', height: 340, background: '#000', borderRadius: 4, overflow: 'hidden' },
-    sliderWrapper: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, marginBottom: 16 },
-    sliderLabel: { fontSize: 14, color: C.textMuted, whiteSpace: 'nowrap' },
+    resultImg: { width: '100%', borderRadius: 4, display: 'block', marginBottom: 16 },
+    buyBtn: { display: 'block', padding: '14px 0', background: C.buyBtn, color: C.buyBtnText, borderRadius: R.btn, textAlign: 'center', textDecoration: 'none', fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+    upsellNote: { textAlign: 'center', fontSize: 13, color: C.textDim, lineHeight: 1.5 },
+    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+    modalBox: { background: '#3a3a3a', borderRadius: R.modal, padding: 20, width: '92%', maxWidth: 700, color: C.text },
+    modalTitle: { textAlign: 'center', marginBottom: 14, color: C.text, fontSize: 17 },
+    cropContainer: { position: 'relative', width: '100%', height: 300, background: '#000', borderRadius: 4, overflow: 'hidden' },
+    sliderWrapper: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, marginBottom: 14 },
+    sliderLabel: { fontSize: 13, color: C.textMuted, whiteSpace: 'nowrap' },
     slider: { flex: 1, accentColor: '#fff' },
-    modalButtons: { display: 'flex', gap: 12, justifyContent: 'flex-end' },
-    cancelBtn: { padding: '10px 20px', background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: R.btn, cursor: 'pointer', fontSize: 15 },
-    saveBtn: { padding: '10px 20px', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: R.btn, cursor: 'pointer', fontSize: 15, fontWeight: 'bold' },
+    modalButtons: { display: 'flex', gap: 10, justifyContent: 'flex-end' },
+    cancelBtn: { padding: '10px 18px', background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: R.btn, cursor: 'pointer', fontSize: 14 },
+    saveBtn: { padding: '10px 18px', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: R.btn, cursor: 'pointer', fontSize: 14, fontWeight: 'bold' },
   };
 
   return (
@@ -247,50 +198,65 @@ export default function Home() {
       <p style={s.subtitle}>{t.subtitle}</p>
       <p style={s.counter}>{t.counter(count, MAX)}</p>
 
-      <label style={s.uploadBox}>
-        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
-        {croppedPreview
-          ? <img src={croppedPreview} alt="Cropped" style={s.previewImg} />
-          : <div style={s.uploadPlaceholder}>
-              <div style={{ fontSize: 40, marginBottom: 8 }}>📷</div>
-              <p style={{ margin: 0, fontWeight: 'bold', color: C.textMuted }}>{t.upload}</p>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: C.textDim }}>{t.uploadHint}</p>
-            </div>
-        }
-      </label>
+      {/* Ảnh gốc — ẩn khi đã có kết quả */}
+      {!result && (
+        <>
+          <label style={s.uploadBox}>
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
+            {croppedPreview
+              ? <img src={croppedPreview} alt="Cropped" style={s.previewImg} />
+              : <div style={s.uploadPlaceholder}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
+                  <p style={{ margin: 0, fontWeight: 'bold', color: C.textMuted }}>{t.upload}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: C.textDim }}>{t.uploadHint}</p>
+                </div>
+            }
+          </label>
 
-      {croppedPreview && (
-        <label style={s.reuploadBtn}>
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
-          {t.changePhoto}
-        </label>
+          {croppedPreview && (
+            <label style={s.reuploadBtn}>
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
+              {t.changePhoto}
+            </label>
+          )}
+
+          <button
+            onClick={handleGenerate}
+            disabled={!croppedBlob || loading || count >= MAX}
+            style={{ ...s.btn, opacity: (!croppedBlob || loading || count >= MAX) ? 0.5 : 1 }}
+          >
+            {loading ? t.generating : t.generate}
+          </button>
+        </>
       )}
-
-      <button
-        onClick={handleGenerate}
-        disabled={!croppedBlob || loading || count >= MAX}
-        style={{ ...s.btn, opacity: (!croppedBlob || loading || count >= MAX) ? 0.5 : 1 }}
-      >
-        {loading ? t.generating : t.generate}
-      </button>
 
       {count >= MAX && <p style={s.error}>{t.limitReached(MAX)}</p>}
       {error && <p style={s.error}>{error}</p>}
 
+      {/* Kết quả — hiện ảnh đầy đủ không bị che */}
       {result && (
-        <div style={{ marginTop: 16 }}>
-          <p style={s.resultLabel}>{t.resultLabel}</p>
-          <div style={s.watermarkWrapper}>
-            <img src={result} alt="Portrait" style={s.resultImg} />
-            <div style={s.watermark}>© Sketchus</div>
-          </div>
-          <p style={s.sizeNote}>{t.sizeNote}</p>
+        <div>
+          <p style={{ color: C.textMuted, fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{t.resultLabel}</p>
+
+          {/* Ảnh portrait — full width, không watermark, không crop */}
+          <img src={result} alt="Portrait" style={s.resultImg} />
+
+          {/* Nút mua */}
           {checkoutUrl && (
             <a href={checkoutUrl} style={s.buyBtn}>{t.buyBtn(SHOP_CONFIG.price)}</a>
           )}
+
+          {/* Nút tạo lại — thay nút cũ */}
+          <button onClick={handleReset} style={s.btnSecondary}>
+            {t.regenerate}
+          </button>
+
+          {/* Upsell */}
           <p style={s.upsellNote}>
-            {t.upsellText}{' '}
-            <a href={SHOP_CONFIG.originalPortraitUrl} style={{ color: C.text, textDecoration: 'underline' }}>{t.upsellLink}</a>
+            {t.upsellText}<br />
+            <a href={SHOP_CONFIG.originalPortraitUrl} style={{ color: C.text, textDecoration: 'underline', fontWeight: 'bold' }}>
+              {t.upsellLink}
+            </a>
           </p>
         </div>
       )}
