@@ -11,19 +11,19 @@ export const SHOP_CONFIG = {
 
 export const DESIGN = {
   colors: {
-    pageBg: 'transparent',        // Trong suốt — khớp với nền Shopify
-    cardBg: 'transparent',        // Không có card nền
-    accent: '#1a1a1a',            // Đen — màu chính Sketchus
-    accentText: '#ffffff',        // Chữ trắng trên nút đen
-    buyBtn: '#1a1a1a',            // Nút mua màu đen
-    buyBtnText: '#ffffff',
-    text: '#1a1a1a',              // Chữ đen
-    textMuted: '#555555',         // Chữ xám
-    textDim: '#888888',
-    border: '#dddddd',            // Viền xám nhạt
-    linkColor: '#1a1a1a',
-    error: '#cc0000',
-    overlayBg: 'rgba(255,255,255,0.95)', // Loading overlay trắng
+    pageBg: '#4a4a4a',           // Nền xám như Shopify theme
+    cardBg: '#4a4a4a',           // Không có card — tràn viền
+    accent: '#ffffff',            // Nút màu trắng
+    accentText: '#1a1a1a',       // Chữ đen trên nút trắng
+    buyBtn: '#ffffff',
+    buyBtnText: '#1a1a1a',
+    text: '#ffffff',              // Toàn bộ chữ trắng
+    textMuted: '#dddddd',
+    textDim: '#bbbbbb',
+    border: 'rgba(255,255,255,0.3)',
+    linkColor: '#ffffff',
+    error: '#ff6b6b',
+    overlayBg: 'rgba(74,74,74,0.97)',
   },
   font: '"Helvetica Neue", Arial, sans-serif',
   borderRadius: {
@@ -53,7 +53,7 @@ export const TRANSLATIONS = {
     buyBtn: (price) => `Jetzt bestellen — ${price}`,
     upsellText: 'Lieber ein echtes handgezeichnetes Original?',
     upsellLink: 'Sketchus Original ansehen →',
-    loadingHeadline: 'Dein Portrait wird erstellt',
+    loadingHeadline: 'DEIN PORTRAIT WIRD ERSTELLT',
     loadingSteps: [
       'Foto wird analysiert',
       'Bleistiftskizze wird erstellt',
@@ -82,7 +82,7 @@ export const TRANSLATIONS = {
     buyBtn: (price) => `Order now — ${price}`,
     upsellText: 'Prefer a real hand-drawn original?',
     upsellLink: 'View Sketchus Original →',
-    loadingHeadline: 'Creating your portrait',
+    loadingHeadline: 'CREATING YOUR PORTRAIT',
     loadingSteps: [
       'Analysing photo',
       'Creating pencil sketch',
