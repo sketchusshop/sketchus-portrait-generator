@@ -91,28 +91,34 @@ function LoadingOverlay({ bgImage, t }) {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {bgImage && (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(12px) brightness(0.4)', transform: 'scale(1.1)' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(12px) brightness(0.15)', transform: 'scale(1.1)' }} />
       )}
-      <div style={{ position: 'relative', zIndex: 1, background: C.overlayBg, borderRadius: 20, padding: '40px 48px', maxWidth: 480, width: '90%', textAlign: 'center', backdropFilter: 'blur(8px)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)', fontFamily: DESIGN.font }}>
-        <p style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: 'uppercase', marginBottom: 12 }}>{t.loadingHeadline}</p>
-        <h2 style={{ fontSize: 26, fontWeight: 'bold', color: C.text, marginBottom: 24 }}>{t.loadingSteps[stepIndex]}...</h2>
-        <div style={{ background: '#333', borderRadius: 99, height: 6, marginBottom: 28, overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: `linear-gradient(90deg, ${C.accent}, ${C.buyBtn})`, borderRadius: 99, width: `${progress}%`, transition: 'width 0.2s ease' }} />
+      <div style={{ position: 'relative', zIndex: 1, background: 'rgba(255,255,255,0.97)', borderRadius: 8, padding: '40px 48px', maxWidth: 480, width: '90%', textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.15)', fontFamily: DESIGN.font }}>
+        <p style={{ fontSize: 11, letterSpacing: 3, color: '#999', textTransform: 'uppercase', marginBottom: 12 }}>{t.loadingHeadline}</p>
+        <h2 style={{ fontSize: 22, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 24 }}>{t.loadingSteps[stepIndex]}...</h2>
+
+        {/* Progress bar */}
+        <div style={{ background: '#eee', borderRadius: 99, height: 4, marginBottom: 28, overflow: 'hidden' }}>
+          <div style={{ height: '100%', background: '#1a1a1a', borderRadius: 99, width: `${progress}%`, transition: 'width 0.2s ease' }} />
         </div>
+
+        {/* Steps */}
         <div style={{ textAlign: 'left', marginBottom: 28 }}>
           {t.loadingSteps.map((step, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <span style={{ fontSize: 16, width: 20, textAlign: 'center', color: i < stepIndex ? C.text : i === stepIndex ? C.accent : '#666' }}>
+              <span style={{ fontSize: 14, width: 20, textAlign: 'center', color: i < stepIndex ? '#1a1a1a' : i === stepIndex ? '#1a1a1a' : '#ccc' }}>
                 {i < stepIndex ? '✓' : i === stepIndex ? '●' : '○'}
               </span>
-              <span style={{ fontSize: 15, color: i < stepIndex ? C.textMuted : i === stepIndex ? C.text : '#555', fontWeight: i === stepIndex ? 'bold' : 'normal' }}>
+              <span style={{ fontSize: 14, color: i < stepIndex ? '#666' : i === stepIndex ? '#1a1a1a' : '#bbb', fontWeight: i === stepIndex ? 'bold' : 'normal' }}>
                 {step}
               </span>
             </div>
           ))}
         </div>
-        <div style={{ borderTop: '1px solid #333', paddingTop: 20 }}>
-          <p style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
+
+        {/* Upsell */}
+        <div style={{ borderTop: '1px solid #eee', paddingTop: 20 }}>
+          <p style={{ fontSize: 13, color: '#888', lineHeight: 1.6 }}>
             {t.loadingUpsell('Sketchus')}
           </p>
         </div>
@@ -120,6 +126,7 @@ function LoadingOverlay({ bgImage, t }) {
     </div>
   );
 }
+
 
 export default function Home() {
   const [lang] = useState(() => detectLang());
