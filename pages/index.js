@@ -25,20 +25,18 @@ function getCroppedImg(imageSrc, croppedAreaPixels) {
 function blobToBase64(blob) {
   return new Promise((resolve) => {
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result.split(',')[1];
-      resolve(base64);
-    };
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
     reader.readAsDataURL(blob);
   });
 }
 
 export default function Home() {
-  const [preview, setPreview] = useState(null);
+  const [rawPreview, setRawPreview] = useState(null);
+  const [showCropModal, setShowCropModal] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [cropped, setCropped] = useState(false);
+  const [croppedPreview, setCroppedPreview] = useState(null);
   const [croppedBlob, setCroppedBlob] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -49,32 +47,38 @@ export default function Home() {
   function handleUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
-    setPreview(URL.createObjectURL(file));
-    setCropped(false);
+    setRawPreview(URL.createObjectURL(file));
+    setShowCropModal(true);
+    setCroppedPreview(null);
     setCroppedBlob(null);
     setResult(null);
     setError(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
   }
 
   const onCropComplete = useCallback((_, pixels) => {
     setCroppedAreaPixels(pixels);
   }, []);
 
-  async function handleCrop() {
-    const blob = await getCroppedImg(preview, croppedAreaPixels);
+  async function handleSaveCrop() {
+    const blob = await getCroppedImg(rawPreview, croppedAreaPixels);
     setCroppedBlob(blob);
-    setPreview(URL.createObjectURL(blob));
-    setCropped(true);
+    setCroppedPreview(URL.createObjectURL(blob));
+    setShowCropModal(false);
+  }
+
+  function handleCancelCrop() {
+    setShowCropModal(false);
+    if (!croppedPreview) setRawPreview(null);
   }
 
   async function handleGenerate() {
-    if (!preview || count >= MAX) return;
+    if (!croppedBlob || count >= MAX) return;
     setLoading(true);
     setError(null);
     try {
-      const blob = croppedBlob || await getCroppedImg(preview, croppedAreaPixels || { x: 0, y: 0, width: 512, height: 512 });
-      const base64 = await blobToBase64(blob);
-      
+      const base64 = await blobToBase64(croppedBlob);
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -98,39 +102,30 @@ export default function Home() {
         <p style={styles.subtitle}>Lade dein Foto hoch und erhalte ein künstlerisches Bleistift-Portrait</p>
         <p style={styles.counter}>{count} von {MAX} Vorschauen heute verwendet</p>
 
+        {/* Upload Area */}
         <label style={styles.uploadBox}>
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
-          {!preview
-            ? <div style={styles.uploadPlaceholder}>
+          {croppedPreview
+            ? <img src={croppedPreview} alt="Cropped" style={styles.previewImg} />
+            : <div style={styles.uploadPlaceholder}>
                 <span style={{ fontSize: 48 }}>📷</span>
                 <p>Foto hochladen (JPG, PNG, WEBP)</p>
+                <p style={{ fontSize: 12, color: '#555' }}>Klicken oder Bild hierher ziehen</p>
               </div>
-            : !cropped
-              ? <div style={{ position: 'relative', width: '100%', height: 300 }}>
-                  <Cropper
-                    image={preview}
-                    crop={crop}
-                    zoom={zoom}
-                    aspect={1}
-                    onCropChange={setCrop}
-                    onZoomChange={setZoom}
-                    onCropComplete={onCropComplete}
-                  />
-                </div>
-              : <img src={preview} alt="Cropped" style={styles.previewImg} />
           }
         </label>
 
-        {preview && !cropped && (
-          <button onClick={handleCrop} style={{ ...styles.btn, background: '#4a9eff', marginBottom: 12 }}>
-            ✂️ Ausschnitt bestätigen
-          </button>
+        {croppedPreview && (
+          <label style={styles.reuploadBtn}>
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
+            🔄 Anderes Foto wählen
+          </label>
         )}
 
         <button
           onClick={handleGenerate}
-          disabled={!preview || loading || count >= MAX}
-          style={{ ...styles.btn, opacity: (!preview || loading || count >= MAX) ? 0.5 : 1 }}
+          disabled={!croppedBlob || loading || count >= MAX}
+          style={{ ...styles.btn, opacity: (!croppedBlob || loading || count >= MAX) ? 0.5 : 1 }}
         >
           {loading ? '⏳ Wird erstellt...' : '✏️ Portrait erstellen'}
         </button>
@@ -150,6 +145,46 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Crop Modal */}
+      {showCropModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalBox}>
+            <h2 style={styles.modalTitle}>Bild zuschneiden</h2>
+
+            <div style={styles.cropContainer}>
+              <Cropper
+                image={rawPreview}
+                crop={crop}
+                zoom={zoom}
+                aspect={16 / 9}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
+            </div>
+
+            {/* Zoom Slider */}
+            <div style={styles.sliderWrapper}>
+              <span style={styles.sliderLabel}>🔍 Zoom</span>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.01}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                style={styles.slider}
+              />
+            </div>
+
+            <div style={styles.modalButtons}>
+              <button onClick={handleCancelCrop} style={styles.cancelBtn}>Abbrechen</button>
+              <button onClick={handleSaveCrop} style={styles.saveBtn}>Speichern</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -160,9 +195,10 @@ const styles = {
   title: { textAlign: 'center', fontSize: 28, color: '#f0c040', marginBottom: 8 },
   subtitle: { textAlign: 'center', color: '#aaa', marginBottom: 8, fontSize: 14 },
   counter: { textAlign: 'center', color: '#888', fontSize: 13, marginBottom: 24 },
-  uploadBox: { display: 'block', border: '2px dashed #444', borderRadius: 12, padding: 20, cursor: 'pointer', marginBottom: 20, minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  uploadBox: { display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed #444', borderRadius: 12, padding: 20, cursor: 'pointer', marginBottom: 12, minHeight: 200, overflow: 'hidden' },
   uploadPlaceholder: { textAlign: 'center', color: '#666' },
   previewImg: { maxWidth: '100%', maxHeight: 300, borderRadius: 8 },
+  reuploadBtn: { display: 'block', textAlign: 'center', color: '#4a9eff', cursor: 'pointer', marginBottom: 16, fontSize: 14 },
   btn: { width: '100%', padding: '14px 0', background: '#f0c040', color: '#1a1a2e', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 'bold', cursor: 'pointer', marginBottom: 16 },
   error: { color: '#ff6b6b', textAlign: 'center' },
   resultBox: { marginTop: 24 },
@@ -171,4 +207,15 @@ const styles = {
   resultImg: { width: '100%', borderRadius: 8 },
   watermark: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%) rotate(-30deg)', fontSize: 36, color: 'rgba(255,255,255,0.4)', fontWeight: 'bold', pointerEvents: 'none', whiteSpace: 'nowrap' },
   buyBtn: { display: 'block', marginTop: 16, padding: '14px 0', background: '#e63946', color: '#fff', borderRadius: 8, textAlign: 'center', textDecoration: 'none', fontSize: 18, fontWeight: 'bold' },
+  // Modal
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  modalBox: { background: '#16213e', borderRadius: 16, padding: 24, width: '90%', maxWidth: 700, color: '#eee' },
+  modalTitle: { textAlign: 'center', marginBottom: 16, color: '#f0c040', fontSize: 20 },
+  cropContainer: { position: 'relative', width: '100%', height: 380, background: '#000', borderRadius: 8, overflow: 'hidden' },
+  sliderWrapper: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 16, marginBottom: 16 },
+  sliderLabel: { fontSize: 14, color: '#aaa', whiteSpace: 'nowrap' },
+  slider: { flex: 1, accentColor: '#f0c040' },
+  modalButtons: { display: 'flex', gap: 12, justifyContent: 'flex-end' },
+  cancelBtn: { padding: '10px 24px', background: 'transparent', border: '1px solid #555', color: '#aaa', borderRadius: 8, cursor: 'pointer', fontSize: 16 },
+  saveBtn: { padding: '10px 24px', background: '#f0c040', color: '#1a1a2e', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 16, fontWeight: 'bold' },
 };
