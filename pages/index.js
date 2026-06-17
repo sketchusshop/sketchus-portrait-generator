@@ -24,17 +24,16 @@ function detectLang() {
 }
 
 function loadHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-  } catch { return []; }
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+  catch { return []; }
 }
 
 function saveToHistory(item) {
   try {
-    const history = loadHistory();
-    history.unshift(item);
-    if (history.length > MAX_HISTORY) history.pop();
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    const h = loadHistory();
+    h.unshift(item);
+    if (h.length > MAX_HISTORY) h.pop();
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
   } catch {}
 }
 
@@ -114,23 +113,19 @@ function LoadingOverlay({ bgImage, t }) {
   );
 }
 
-// Component hiện lịch sử ảnh đã tạo
 function HistoryPanel({ history, onSelect, onClose, t }) {
-  if (!history.length) return null;
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1500, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.pageBg }}>
-        <span style={{ color: C.text, fontWeight: 'bold', fontSize: 16 }}>
-          {t.historyTitle}
-        </span>
-        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textMuted, fontSize: 22, cursor: 'pointer', padding: '0 4px' }}>✕</button>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: C.pageBg, zIndex: 1500, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}` }}>
+        <span style={{ color: C.text, fontWeight: 'bold', fontSize: 16 }}>{t.historyTitle}</span>
+        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textMuted, fontSize: 24, cursor: 'pointer' }}>✕</button>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: C.pageBg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {history.map((item, i) => (
-          <div key={i} style={{ marginBottom: 16, borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+          <div key={i} style={{ marginBottom: 20, borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}` }}>
             <img src={item.imageUrl} alt={`Portrait ${i + 1}`} style={{ width: '100%', display: 'block' }} />
-            <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.2)' }}>
-              <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 8px' }}>{item.createdAt}</p>
+            <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.15)' }}>
+              <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 10px' }}>{item.createdAt}</p>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => onSelect(item)}
@@ -138,12 +133,12 @@ function HistoryPanel({ history, onSelect, onClose, t }) {
                 >
                   {t.historySelect}
                 </button>
-                <a
-                  href={item.checkoutUrl}
-                  style={{ flex: 1, padding: '10px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 14, textAlign: 'center', textDecoration: 'none', display: 'block' }}
+                <button
+                  onClick={() => { window.top.location.href = item.checkoutUrl; }}
+                  style={{ flex: 1, padding: '10px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 14, cursor: 'pointer' }}
                 >
                   {t.buyBtn(SHOP_CONFIG.price)}
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -173,11 +168,9 @@ export default function Home() {
   const [history, setHistory] = useState([]);
   const MAX = SHOP_CONFIG.maxPreviewsPerDay;
 
-  // Load từ localStorage khi khởi động
   useEffect(() => {
     const h = loadHistory();
     setHistory(h);
-    // Khôi phục ảnh mới nhất nếu có
     if (h.length > 0) {
       setResult(h[0].imageUrl);
       setCheckoutUrl(h[0].checkoutUrl);
@@ -209,12 +202,8 @@ export default function Home() {
   }
 
   function handleReset() {
-    setResult(null);
-    setCheckoutUrl(null);
-    setError(null);
-    setCroppedPreview(null);
-    setCroppedBlob(null);
-    setRawPreview(null);
+    setResult(null); setCheckoutUrl(null); setError(null);
+    setCroppedPreview(null); setCroppedBlob(null); setRawPreview(null);
   }
 
   function handleSelectFromHistory(item) {
@@ -241,12 +230,8 @@ export default function Home() {
         checkoutUrl: data.checkoutUrl,
         createdAt: new Date().toLocaleString('de-DE'),
       };
-
-      // Lưu vào localStorage
       saveToHistory(newItem);
-      const newHistory = loadHistory();
-      setHistory(newHistory);
-
+      setHistory(loadHistory());
       setResult(data.imageUrl);
       setCheckoutUrl(data.checkoutUrl);
       setCount(c => c + 1);
@@ -258,7 +243,7 @@ export default function Home() {
   }
 
   const s = {
-    container: { minHeight: '100vh', background: C.pageBg, padding: '16px 16px 32px', fontFamily: DESIGN.font, color: C.text, boxSizing: 'border-box' },
+    container: { minHeight: '100vh', background: C.pageBg, padding: '16px 16px 40px', fontFamily: DESIGN.font, color: C.text, boxSizing: 'border-box' },
     title: { fontSize: 20, fontWeight: 'bold', color: C.text, marginBottom: 4, textAlign: 'center' },
     subtitle: { color: C.textMuted, marginBottom: 4, fontSize: 13, textAlign: 'center', lineHeight: 1.5 },
     counter: { color: C.textDim, fontSize: 12, marginBottom: 16, textAlign: 'center' },
@@ -268,24 +253,16 @@ export default function Home() {
     btn: { width: '100%', padding: '14px 0', background: C.accent, color: C.accentText, border: 'none', borderRadius: R.btn, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginBottom: 10 },
     btnSecondary: { width: '100%', padding: '11px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 14, cursor: 'pointer', marginBottom: 10 },
     btnHistory: { width: '100%', padding: '10px 0', background: 'transparent', color: C.textDim, border: `1px solid rgba(255,255,255,0.15)`, borderRadius: R.btn, fontSize: 13, cursor: 'pointer', marginBottom: 10 },
+    buyBtn: { width: '100%', padding: '14px 0', background: C.buyBtn, color: C.buyBtnText, border: 'none', borderRadius: R.btn, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginBottom: 10 },
     error: { color: C.error, textAlign: 'center', fontSize: 13, marginBottom: 10 },
     resultImg: { width: '100%', borderRadius: 4, display: 'block', marginBottom: 14 },
-    buyBtn: { display: 'block', padding: '14px 0', background: C.buyBtn, color: C.buyBtnText, borderRadius: R.btn, textAlign: 'center', textDecoration: 'none', fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
     upsellNote: { textAlign: 'center', fontSize: 13, color: C.textDim, lineHeight: 1.5 },
   };
 
   return (
     <div style={s.container}>
       {loading && <LoadingOverlay bgImage={croppedPreview} t={t} />}
-
-      {showHistory && (
-        <HistoryPanel
-          history={history}
-          onSelect={handleSelectFromHistory}
-          onClose={() => setShowHistory(false)}
-          t={t}
-        />
-      )}
+      {showHistory && <HistoryPanel history={history} onSelect={handleSelectFromHistory} onClose={() => setShowHistory(false)} t={t} />}
 
       <h1 style={s.title}>{t.title}</h1>
       <p style={s.subtitle}>{t.subtitle}</p>
@@ -320,7 +297,6 @@ export default function Home() {
             {loading ? t.generating : t.generate}
           </button>
 
-          {/* Nút xem lịch sử — chỉ hiện nếu có */}
           {history.length > 0 && (
             <button onClick={() => setShowHistory(true)} style={s.btnHistory}>
               🕐 {t.historyBtn} ({history.length})
@@ -337,13 +313,19 @@ export default function Home() {
           <p style={{ color: C.textMuted, fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{t.resultLabel}</p>
           <img src={result} alt="Portrait" style={s.resultImg} />
 
+          {/* Nút mua — dùng window.top để thoát khỏi iframe */}
           {checkoutUrl && (
-            <a href={checkoutUrl} style={s.buyBtn}>{t.buyBtn(SHOP_CONFIG.price)}</a>
+            <button
+              onClick={() => { window.top.location.href = checkoutUrl; }}
+              style={s.buyBtn}
+            >
+              {t.buyBtn(SHOP_CONFIG.price)}
+            </button>
           )}
 
           <button onClick={handleReset} style={s.btnSecondary}>{t.regenerate}</button>
 
-          {history.length > 1 && (
+          {history.length > 0 && (
             <button onClick={() => setShowHistory(true)} style={s.btnHistory}>
               🕐 {t.historyBtn} ({history.length})
             </button>
@@ -351,7 +333,11 @@ export default function Home() {
 
           <p style={s.upsellNote}>
             {t.upsellText}<br />
-            <a href={SHOP_CONFIG.originalPortraitUrl} style={{ color: C.text, textDecoration: 'underline', fontWeight: 'bold' }}>
+            <a
+              href={SHOP_CONFIG.originalPortraitUrl}
+              onClick={(e) => { e.preventDefault(); window.top.location.href = SHOP_CONFIG.originalPortraitUrl; }}
+              style={{ color: C.text, textDecoration: 'underline', fontWeight: 'bold' }}
+            >
               {t.upsellLink}
             </a>
           </p>
