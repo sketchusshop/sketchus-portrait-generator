@@ -1,160 +1,144 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Cropper from 'react-easy-crop';
-import { SHOP_CONFIG, DESIGN, TRANSLATIONS } from '../config';
+import { SHOP_CONFIG, DESIGN, T } from '../config';
 
+// ─── Constants ───────────────────────────────────────────────
 const C = DESIGN.colors;
-const R = DESIGN.borderRadius;
-
+const HISTORY_KEY = 'sk_history_v2';
+const MAX_HIST = 5;
 const RATIOS = { landscape: 297 / 210, portrait: 210 / 297 };
-const HISTORY_KEY = 'sketchus_portrait_history';
-const MAX_HISTORY = 5;
 
-function detectLang() {
+// ─── Helpers ─────────────────────────────────────────────────
+function getLang() {
   if (typeof window === 'undefined') return 'de';
-  const urlLang = new URLSearchParams(window.location.search).get('lang');
-  if (urlLang === 'en' || urlLang === 'de') return urlLang;
-  const host = window.location.hostname;
-  if (host.endsWith('.com') || host.endsWith('.co.uk') || host.endsWith('.us')) return 'en';
-  if (host.endsWith('.de') || host.endsWith('.at') || host.endsWith('.ch')) return 'de';
-  return navigator.language?.slice(0, 2) === 'de' ? 'de' : 'en';
+  const p = new URLSearchParams(window.location.search).get('lang');
+  if (p === 'de' || p === 'en') return p;
+  const h = window.location.hostname;
+  if (h.endsWith('.com') || h.endsWith('.co.uk')) return 'en';
+  const nav = navigator.language?.slice(0, 2);
+  return nav === 'en' ? 'en' : 'de';
 }
 
-function loadHistory() {
+function readHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
   catch { return []; }
 }
 
-function saveToHistory(item) {
+function pushHistory(item) {
   try {
-    const h = loadHistory();
+    const h = readHistory();
     h.unshift(item);
-    if (h.length > MAX_HISTORY) h.pop();
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, MAX_HIST)));
   } catch {}
 }
 
-function getCroppedImg(imageSrc, croppedAreaPixels) {
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.src = imageSrc;
-    image.onload = () => {
-      const maxSize = 1024;
-      let w = croppedAreaPixels.width, h = croppedAreaPixels.height;
-      if (w > maxSize || h > maxSize) {
-        const ratio = Math.min(maxSize / w, maxSize / h);
-        w = Math.round(w * ratio); h = Math.round(h * ratio);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(image, croppedAreaPixels.x, croppedAreaPixels.y, croppedAreaPixels.width, croppedAreaPixels.height, 0, 0, w, h);
-      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+function cropImage(src, pixels) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      const MAX = 1024;
+      let w = pixels.width, h = pixels.height;
+      if (w > MAX || h > MAX) { const r = Math.min(MAX / w, MAX / h); w = Math.round(w * r); h = Math.round(h * r); }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, pixels.x, pixels.y, pixels.width, pixels.height, 0, 0, w, h);
+      c.toBlob(b => resolve(b), 'image/jpeg', 0.9);
     };
   });
 }
 
-function blobToBase64(blob) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-    reader.readAsDataURL(blob);
+function toBase64(blob) {
+  return new Promise(resolve => {
+    const r = new FileReader();
+    r.onloadend = () => resolve(r.result.split(',')[1]);
+    r.readAsDataURL(blob);
   });
 }
 
-// Thêm vào giỏ hàng Shopify đúng cách qua /cart/add
-async function addToCart(aiStoredUrl, originalStoredUrl) {
-  const properties = { 'Portrait-Vorschau': aiStoredUrl };
-  if (originalStoredUrl) properties['Originalfoto'] = originalStoredUrl;
+// Thêm vào giỏ hàng Shopify — dùng /cart/add.js (không lỗi properties)
+async function shopifyAddToCart(aiUrl, origUrl) {
+  const properties = { 'Portrait-Vorschau': aiUrl };
+  if (origUrl) properties['Originalfoto'] = origUrl;
   properties['Erstellt am'] = new Date().toLocaleString('de-DE');
 
-  const res = await fetch(`https://${SHOP_CONFIG.shopDomain}/cart/add.js`, {
+  const r = await fetch(`https://${SHOP_CONFIG.shopDomain}/cart/add.js`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      id: SHOP_CONFIG.variantId,
+      id: Number(SHOP_CONFIG.variantId),
       quantity: 1,
       properties,
     }),
   });
-  if (!res.ok) throw new Error('Cart add failed');
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.description || 'Cart error');
+  }
   return `https://${SHOP_CONFIG.shopDomain}/checkout`;
 }
 
-function LoadingOverlay({ bgImage, t }) {
-  const [progress, setProgress] = useState(0);
-  const [stepIndex, setStepIndex] = useState(0);
+// ─── Loading Overlay ─────────────────────────────────────────
+function LoadingOverlay({ bg, t }) {
+  const [pct, setPct] = useState(0);
+  const [step, setStep] = useState(0);
   useEffect(() => {
-    const totalMs = SHOP_CONFIG.estimatedLoadingMs;
-    const interval = 200;
-    const increment = (interval / totalMs) * 100;
-    const timer = setInterval(() => {
-      setProgress(prev => {
-        const next = Math.min(prev + increment, 95);
-        if (next < 25) setStepIndex(0);
-        else if (next < 55) setStepIndex(1);
-        else if (next < 80) setStepIndex(2);
-        else setStepIndex(3);
-        return next;
+    const ms = SHOP_CONFIG.estimatedLoadingMs;
+    const tick = 250;
+    const inc = (tick / ms) * 100;
+    const id = setInterval(() => {
+      setPct(p => {
+        const n = Math.min(p + inc, 95);
+        setStep(n < 25 ? 0 : n < 55 ? 1 : n < 80 ? 2 : 3);
+        return n;
       });
-    }, interval);
-    return () => clearInterval(timer);
+    }, tick);
+    return () => clearInterval(id);
   }, []);
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(99,99,99,0.97)' }}>
-      {bgImage && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(16px) brightness(0.2)', transform: 'scale(1.1)' }} />}
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 380, width: '90%', textAlign: 'center', fontFamily: DESIGN.font, padding: '0 16px' }}>
-        <p style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: 'uppercase', marginBottom: 12 }}>{t.loadingHeadline}</p>
-        <h2 style={{ fontSize: 20, fontWeight: 'bold', color: C.text, marginBottom: 24 }}>{t.loadingSteps[stepIndex]}...</h2>
-        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 28, overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: '#fff', borderRadius: 99, width: `${progress}%`, transition: 'width 0.2s ease' }} />
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(80,80,80,0.97)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {bg && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(20px) brightness(0.15)', transform: 'scale(1.1)' }} />}
+      <div style={{ position: 'relative', width: '88%', maxWidth: 360, textAlign: 'center', color: '#fff', fontFamily: DESIGN.font }}>
+        <p style={{ fontSize: 10, letterSpacing: 3, color: C.textDim, textTransform: 'uppercase', marginBottom: 10 }}>{t.loadingHeadline}</p>
+        <h2 style={{ fontSize: 19, fontWeight: 'bold', marginBottom: 20 }}>{t.loadingSteps[step]}…</h2>
+        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 24, overflow: 'hidden' }}>
+          <div style={{ height: '100%', background: '#fff', width: `${pct}%`, transition: 'width 0.25s' }} />
         </div>
-        <div style={{ textAlign: 'left', marginBottom: 28 }}>
-          {t.loadingSteps.map((step, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <span style={{ fontSize: 14, width: 20, textAlign: 'center', color: i <= stepIndex ? '#fff' : 'rgba(255,255,255,0.3)' }}>
-                {i < stepIndex ? '✓' : i === stepIndex ? '●' : '○'}
-              </span>
-              <span style={{ fontSize: 14, color: i < stepIndex ? C.textMuted : i === stepIndex ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: i === stepIndex ? 'bold' : 'normal' }}>
-                {step}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 20 }}>
-          <p style={{ fontSize: 13, color: C.textDim, lineHeight: 1.6 }}>{t.loadingUpsell()}</p>
-        </div>
+        {t.loadingSteps.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, textAlign: 'left' }}>
+            <span style={{ width: 18, textAlign: 'center', fontSize: 13, color: i <= step ? '#fff' : 'rgba(255,255,255,0.25)' }}>
+              {i < step ? '✓' : i === step ? '●' : '○'}
+            </span>
+            <span style={{ fontSize: 13, color: i < step ? C.textMuted : i === step ? '#fff' : 'rgba(255,255,255,0.25)', fontWeight: i === step ? 'bold' : 'normal' }}>{s}</span>
+          </div>
+        ))}
+        <p style={{ fontSize: 12, color: C.textDim, marginTop: 20, lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 16 }}>{t.loadingNote}</p>
       </div>
     </div>
   );
 }
 
-function HistoryPanel({ history, onSelect, onClose, onBuy, t }) {
+// ─── History Panel ────────────────────────────────────────────
+function HistoryPanel({ items, onSelect, onOrder, onClose, t }) {
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: C.pageBg, zIndex: 1500, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1500, background: C.pageBg, display: 'flex', flexDirection: 'column', fontFamily: DESIGN.font }}>
       <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-        <span style={{ color: C.text, fontWeight: 'bold', fontSize: 16 }}>{t.historyTitle} ({history.length})</span>
-        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textMuted, fontSize: 24, cursor: 'pointer' }}>✕</button>
+        <span style={{ color: C.text, fontWeight: 'bold', fontSize: 16 }}>{t.historyTitle} ({items.length})</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: C.textMuted, fontSize: 26, cursor: 'pointer', lineHeight: 1 }}>✕</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-        {history.map((item, i) => (
-          <div key={i} style={{ marginBottom: 20, borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}` }}>
-            <img src={item.imageUrl} alt={`Portrait ${i + 1}`} style={{ width: '100%', display: 'block' }} />
+        {items.map((item, i) => (
+          <div key={i} style={{ marginBottom: 20, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            <img src={item.imageUrl} alt="" style={{ width: '100%', display: 'block' }} />
             <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.15)' }}>
-              <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 10px' }}>
-                #{history.length - i} · {item.createdAt}
-              </p>
+              <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 10px' }}>#{items.length - i} · {item.createdAt}</p>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => onSelect(item)}
-                  style={{ flex: 1, padding: '10px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: R.btn, fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}
-                >
+                <button onClick={() => onSelect(item)} style={{ flex: 1, padding: '11px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: DESIGN.btn, fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
                   {t.historySelect}
                 </button>
-                <button
-                  onClick={() => onBuy(item)}
-                  style={{ flex: 1, padding: '10px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 14, cursor: 'pointer' }}
-                >
-                  {t.buyBtn(SHOP_CONFIG.price)}
+                <button onClick={() => onOrder(item)} style={{ flex: 1, padding: '11px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: DESIGN.btn, fontSize: 14, cursor: 'pointer' }}>
+                  {t.historyOrder(SHOP_CONFIG.price)}
                 </button>
               </div>
             </div>
@@ -165,248 +149,249 @@ function HistoryPanel({ history, onSelect, onClose, onBuy, t }) {
   );
 }
 
-export default function Home() {
-  const [lang] = useState(() => detectLang());
-  const t = TRANSLATIONS[lang];
-  const [rawPreview, setRawPreview] = useState(null);
-  const [showCropModal, setShowCropModal] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [orientation, setOrientation] = useState('landscape');
+// ─── Main Component ───────────────────────────────────────────
+export default function App() {
+  const lang = useRef(getLang()).current;
+  const t = T[lang];
+
+  // Upload & crop
+  const [rawSrc, setRawSrc] = useState(null);
+  const [showCrop, setShowCrop] = useState(false);
+  const [orient, setOrient] = useState('landscape');
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [croppedPreview, setCroppedPreview] = useState(null);
-  const [croppedBlob, setCroppedBlob] = useState(null);
-  const [result, setResult] = useState(null);
-  const [currentItem, setCurrentItem] = useState(null); // lưu full item hiện tại
+  const [cropPx, setCropPx] = useState(null);
+  const [previewSrc, setPreviewSrc] = useState(null);
+  const [previewBlob, setPreviewBlob] = useState(null);
+
+  // Result
+  const [result, setResult] = useState(null);   // { imageUrl, aiStoredUrl, origStoredUrl }
   const [loading, setLoading] = useState(false);
   const [buyLoading, setBuyLoading] = useState(false);
   const [error, setError] = useState(null);
   const [count, setCount] = useState(0);
+
+  // History
   const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+
   const MAX = SHOP_CONFIG.maxPreviewsPerDay;
 
-  useEffect(() => {
-    const h = loadHistory();
-    setHistory(h);
-    // KHÔNG tự load ảnh — để khách chủ động xem lịch sử
-  }, []);
+  useEffect(() => { setHistory(readHistory()); }, []);
 
-  function handleUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    setRawPreview(URL.createObjectURL(file));
-    setShowCropModal(true);
-    setCroppedPreview(null); setCroppedBlob(null);
-    setResult(null); setCurrentItem(null); setError(null);
+  // ── Upload
+  function handleFile(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setRawSrc(URL.createObjectURL(f));
+    setPreviewSrc(null); setPreviewBlob(null);
+    setResult(null); setError(null);
+    setCrop({ x: 0, y: 0 }); setZoom(1);
+    setShowCrop(true);
+  }
+
+  // ── Crop
+  const onCropDone = useCallback((_, px) => setCropPx(px), []);
+
+  async function saveCrop() {
+    const blob = await cropImage(rawSrc, cropPx);
+    setPreviewBlob(blob);
+    setPreviewSrc(URL.createObjectURL(blob));
+    setShowCrop(false);
+  }
+
+  function cancelCrop() {
+    setShowCrop(false);
+    if (!previewSrc) setRawSrc(null);
+  }
+
+  function toggleOrient() {
+    setOrient(o => o === 'landscape' ? 'portrait' : 'landscape');
     setCrop({ x: 0, y: 0 }); setZoom(1);
   }
 
-  const onCropComplete = useCallback((_, pixels) => setCroppedAreaPixels(pixels), []);
-
-  async function handleSaveCrop() {
-    const blob = await getCroppedImg(rawPreview, croppedAreaPixels);
-    setCroppedBlob(blob);
-    setCroppedPreview(URL.createObjectURL(blob));
-    setShowCropModal(false);
-  }
-
-  function handleCancelCrop() {
-    setShowCropModal(false);
-    if (!croppedPreview) setRawPreview(null);
-  }
-
-  function handleReset() {
-    setResult(null); setCurrentItem(null); setError(null);
-    setCroppedPreview(null); setCroppedBlob(null); setRawPreview(null);
-  }
-
-  function handleSelectFromHistory(item) {
-    setResult(item.imageUrl);
-    setCurrentItem(item);
-    setShowHistory(false);
-  }
-
-  async function handleBuy(item) {
-    setBuyLoading(true);
-    try {
-      const checkoutUrl = await addToCart(item.aiStoredUrl, item.originalStoredUrl);
-      window.top.location.href = checkoutUrl;
-    } catch (e) {
-      alert('Fehler beim Hinzufügen zum Warenkorb. Bitte erneut versuchen.');
-    } finally {
-      setBuyLoading(false);
-    }
-  }
-
-  async function handleGenerate() {
-    if (!croppedBlob || count >= MAX) return;
+  // ── Generate
+  async function generate() {
+    if (!previewBlob || count >= MAX) return;
     setLoading(true); setError(null);
     try {
-      const base64 = await blobToBase64(croppedBlob);
+      const b64 = await toBase64(previewBlob);
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, originalBase64: base64, orientation }),
+        body: JSON.stringify({ imageBase64: b64, originalBase64: b64 }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t.errorGeneric);
+      if (!res.ok) throw new Error(data.error || t.error);
 
-      const newItem = {
+      const item = {
         imageUrl: data.imageUrl,
         aiStoredUrl: data.aiStoredUrl,
-        originalStoredUrl: data.originalStoredUrl,
-        createdAt: data.createdAt,
+        origStoredUrl: data.origStoredUrl,
+        createdAt: new Date().toLocaleString('de-DE'),
       };
-      saveToHistory(newItem);
-      setHistory(loadHistory());
-      setResult(data.imageUrl);
-      setCurrentItem(newItem);
+      pushHistory(item);
+      setHistory(readHistory());
+      setResult(item);
       setCount(c => c + 1);
-    } catch (err) {
-      setError(err.message);
+    } catch (e) {
+      setError(e.message);
     } finally {
       setLoading(false);
     }
   }
 
-  const s = {
-    container: { minHeight: '100vh', background: C.pageBg, padding: '16px 16px 40px', fontFamily: DESIGN.font, color: C.text, boxSizing: 'border-box' },
-    title: { fontSize: 20, fontWeight: 'bold', color: C.text, marginBottom: 4, textAlign: 'center' },
-    subtitle: { color: C.textMuted, marginBottom: 4, fontSize: 13, textAlign: 'center', lineHeight: 1.5 },
-    counter: { color: C.textDim, fontSize: 12, marginBottom: 16, textAlign: 'center' },
-    uploadBox: { display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px dashed ${C.border}`, borderRadius: R.upload, padding: 16, cursor: 'pointer', marginBottom: 10, minHeight: 130, overflow: 'hidden' },
-    previewImg: { maxWidth: '100%', maxHeight: 180, borderRadius: 4 },
-    reuploadBtn: { display: 'block', textAlign: 'center', color: C.textMuted, cursor: 'pointer', marginBottom: 12, fontSize: 13, textDecoration: 'underline' },
-    btn: { width: '100%', padding: '14px 0', background: C.accent, color: C.accentText, border: 'none', borderRadius: R.btn, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginBottom: 10 },
-    btnSecondary: { width: '100%', padding: '11px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 14, cursor: 'pointer', marginBottom: 10 },
-    btnHistory: { width: '100%', padding: '10px 0', background: 'transparent', color: C.textDim, border: `1px solid rgba(255,255,255,0.15)`, borderRadius: R.btn, fontSize: 13, cursor: 'pointer', marginBottom: 10 },
-    buyBtn: { width: '100%', padding: '14px 0', background: C.buyBtn, color: C.buyBtnText, border: 'none', borderRadius: R.btn, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginBottom: 10 },
-    error: { color: C.error, textAlign: 'center', fontSize: 13, marginBottom: 10 },
-    resultImg: { width: '100%', borderRadius: 4, display: 'block', marginBottom: 14 },
-    upsellNote: { textAlign: 'center', fontSize: 13, color: C.textDim, lineHeight: 1.5 },
-  };
+  // ── Buy
+  async function buy(item) {
+    setBuyLoading(true); setError(null);
+    try {
+      const url = await shopifyAddToCart(item.aiStoredUrl, item.origStoredUrl);
+      window.top.location.href = url;
+    } catch (e) {
+      setError(t.cartError + ' (' + e.message + ')');
+      setBuyLoading(false);
+    }
+  }
+
+  // ── Reset
+  function reset() {
+    setResult(null); setError(null);
+    setPreviewSrc(null); setPreviewBlob(null); setRawSrc(null);
+  }
+
+  // ── Styles
+  const btn = (bg, color, border) => ({
+    width: '100%', padding: '14px 0', background: bg, color,
+    border: border || 'none', borderRadius: DESIGN.btn,
+    fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginBottom: 10,
+    fontFamily: DESIGN.font,
+  });
 
   return (
-    <div style={s.container}>
-      {loading && <LoadingOverlay bgImage={croppedPreview} t={t} />}
+    <div style={{ minHeight: '100vh', background: C.pageBg, padding: '18px 16px 48px', fontFamily: DESIGN.font, color: C.text, boxSizing: 'border-box' }}>
+
+      {loading && <LoadingOverlay bg={previewSrc} t={t} />}
       {showHistory && (
         <HistoryPanel
-          history={history}
-          onSelect={handleSelectFromHistory}
+          items={history}
+          onSelect={item => { setResult(item); setShowHistory(false); }}
+          onOrder={item => { setShowHistory(false); buy(item); }}
           onClose={() => setShowHistory(false)}
-          onBuy={handleBuy}
           t={t}
         />
       )}
 
-      <h1 style={s.title}>{t.title}</h1>
-      <p style={s.subtitle}>{t.subtitle}</p>
-      <p style={s.counter}>{t.counter(count, MAX)}</p>
+      {/* Header */}
+      <h1 style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 4 }}>{t.title}</h1>
+      <p style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', marginBottom: 4, lineHeight: 1.5 }}>{t.subtitle}</p>
+      <p style={{ fontSize: 12, color: C.textDim, textAlign: 'center', marginBottom: 18 }}>{t.counter(count, MAX)}</p>
 
+      {/* Upload + Generate — ẩn khi có result */}
       {!result && (
         <>
-          <label style={s.uploadBox}>
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
-            {croppedPreview
-              ? <img src={croppedPreview} alt="Cropped" style={s.previewImg} />
-              : <div style={{ textAlign: 'center', color: C.textDim }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px dashed ${C.border}`, borderRadius: 4, minHeight: 140, cursor: 'pointer', marginBottom: 10, overflow: 'hidden' }}>
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} style={{ display: 'none' }} />
+            {previewSrc
+              ? <img src={previewSrc} alt="" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4 }} />
+              : <div style={{ textAlign: 'center', color: C.textDim, padding: 16 }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
                   <p style={{ margin: 0, fontWeight: 'bold', color: C.textMuted }}>{t.upload}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: C.textDim }}>{t.uploadHint}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12 }}>{t.uploadHint}</p>
                 </div>
             }
           </label>
 
-          {croppedPreview && (
-            <label style={s.reuploadBtn}>
-              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
+          {previewSrc && (
+            <label style={{ display: 'block', textAlign: 'center', color: C.textMuted, fontSize: 13, textDecoration: 'underline', cursor: 'pointer', marginBottom: 12 }}>
+              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} style={{ display: 'none' }} />
               {t.changePhoto}
             </label>
           )}
 
-          <button
-            onClick={handleGenerate}
-            disabled={!croppedBlob || loading || count >= MAX}
-            style={{ ...s.btn, opacity: (!croppedBlob || loading || count >= MAX) ? 0.5 : 1 }}
-          >
-            {loading ? t.generating : t.generate}
+          <button onClick={generate} disabled={!previewBlob || loading || count >= MAX}
+            style={{ ...btn('#fff', '#1a1a1a'), opacity: (!previewBlob || loading || count >= MAX) ? 0.45 : 1 }}>
+            {t.generate}
           </button>
 
+          {count >= MAX && <p style={{ color: C.error, textAlign: 'center', fontSize: 13, marginBottom: 10 }}>{t.limitReached(MAX)}</p>}
+          {error && <p style={{ color: C.error, textAlign: 'center', fontSize: 13, marginBottom: 10 }}>{error}</p>}
+
           {history.length > 0 && (
-            <button onClick={() => setShowHistory(true)} style={s.btnHistory}>
-              🕐 {t.historyBtn} ({history.length})
+            <button onClick={() => setShowHistory(true)} style={{ ...btn('transparent', C.textDim, `1px solid rgba(255,255,255,0.2)`), fontWeight: 'normal', fontSize: 14 }}>
+              {t.historyBtn(history.length)}
             </button>
           )}
         </>
       )}
 
-      {count >= MAX && <p style={s.error}>{t.limitReached(MAX)}</p>}
-      {error && <p style={s.error}>{error}</p>}
-
+      {/* Result */}
       {result && (
-        <div>
-          <p style={{ color: C.textMuted, fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{t.resultLabel}</p>
-          <img src={result} alt="Portrait" style={s.resultImg} />
+        <>
+          <p style={{ fontSize: 13, color: C.textMuted, textAlign: 'center', marginBottom: 10 }}>{t.resultLabel}</p>
+          <img src={result.imageUrl} alt="Portrait" style={{ width: '100%', borderRadius: 4, display: 'block', marginBottom: 14 }} />
 
-          <button
-            onClick={() => currentItem && handleBuy(currentItem)}
-            disabled={buyLoading || !currentItem}
-            style={{ ...s.buyBtn, opacity: buyLoading ? 0.7 : 1 }}
-          >
-            {buyLoading ? '...' : t.buyBtn(SHOP_CONFIG.price)}
+          {error && <p style={{ color: C.error, textAlign: 'center', fontSize: 13, marginBottom: 10 }}>{error}</p>}
+
+          <button onClick={() => buy(result)} disabled={buyLoading}
+            style={{ ...btn('#fff', '#1a1a1a'), opacity: buyLoading ? 0.6 : 1 }}>
+            {buyLoading ? t.buyLoading : t.buyBtn(SHOP_CONFIG.price)}
           </button>
 
-          <button onClick={handleReset} style={s.btnSecondary}>{t.regenerate}</button>
+          <button onClick={reset} style={btn('transparent', C.text, `1px solid ${C.border}`)}>
+            {t.regenerate}
+          </button>
 
           {history.length > 0 && (
-            <button onClick={() => setShowHistory(true)} style={s.btnHistory}>
-              🕐 {t.historyBtn} ({history.length})
+            <button onClick={() => setShowHistory(true)} style={{ ...btn('transparent', C.textDim, `1px solid rgba(255,255,255,0.2)`), fontWeight: 'normal', fontSize: 14 }}>
+              {t.historyBtn(history.length)}
             </button>
           )}
 
-          <p style={s.upsellNote}>
+          <p style={{ textAlign: 'center', fontSize: 13, color: C.textDim, lineHeight: 1.6, marginTop: 4 }}>
             {t.upsellText}<br />
-            <a
-              href={SHOP_CONFIG.originalPortraitUrl}
-              onClick={(e) => { e.preventDefault(); window.top.location.href = SHOP_CONFIG.originalPortraitUrl; }}
-              style={{ color: C.text, textDecoration: 'underline', fontWeight: 'bold' }}
+            <span
+              onClick={() => window.top.location.href = SHOP_CONFIG.originalPortraitUrl}
+              style={{ color: C.text, textDecoration: 'underline', fontWeight: 'bold', cursor: 'pointer' }}
             >
               {t.upsellLink}
-            </a>
+            </span>
           </p>
-        </div>
+        </>
       )}
 
-      {showCropModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: C.pageBg, display: 'flex', flexDirection: 'column', zIndex: 1000 }}>
+      {/* Crop Modal — full screen, cùng màu nền */}
+      {showCrop && (
+        <div style={{ position: 'fixed', inset: 0, background: C.pageBg, display: 'flex', flexDirection: 'column', zIndex: 1000 }}>
+          {/* Header */}
           <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <span style={{ color: C.text, fontSize: 15, fontWeight: 'bold' }}>{t.cropTitle}</span>
-            <button
-              onClick={() => { setOrientation(o => o === 'landscape' ? 'portrait' : 'landscape'); setCrop({ x: 0, y: 0 }); setZoom(1); }}
-              style={{ padding: '5px 12px', fontSize: 12, background: 'transparent', color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer' }}
-            >
-              {orientation === 'landscape' ? '↕ Hochformat' : '↔ Querformat'}
+            <button onClick={toggleOrient} style={{ padding: '6px 14px', fontSize: 12, background: 'transparent', color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer' }}>
+              {orient === 'landscape' ? t.toPortrait : t.toLandscape}
             </button>
           </div>
-          <div style={{ position: 'relative', height: 'calc(100vh - 200px)', background: '#4a4a4a', margin: '0 16px', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+
+          {/* Crop area — để lại 180px cho footer */}
+          <div style={{ position: 'relative', flex: 1, margin: '0 16px', borderRadius: 8, overflow: 'hidden', background: '#3a3a3a', minHeight: 0 }}>
             <Cropper
-              image={rawPreview} crop={crop} zoom={zoom}
-              aspect={RATIOS[orientation]}
-              onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropComplete}
+              image={rawSrc} crop={crop} zoom={zoom}
+              aspect={RATIOS[orient]}
+              onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropDone}
             />
           </div>
-          <div style={{ padding: '14px 16px 40px', flexShrink: 0 }}>
+
+          {/* Footer */}
+          <div style={{ padding: '14px 16px 36px', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: C.textMuted, whiteSpace: 'nowrap' }}>{t.zoom}</span>
               <input type="range" min={1} max={3} step={0.01} value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))} style={{ flex: 1, accentColor: '#fff' }} />
+                onChange={e => setZoom(Number(e.target.value))}
+                style={{ flex: 1, accentColor: '#fff' }} />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleCancelCrop} style={{ flex: 1, padding: '14px 0', background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: R.btn, cursor: 'pointer', fontSize: 15 }}>
+              <button onClick={cancelCrop} style={{ flex: 1, padding: '14px 0', background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: DESIGN.btn, cursor: 'pointer', fontSize: 15 }}>
                 {t.cropCancel}
               </button>
-              <button onClick={handleSaveCrop} style={{ flex: 1, padding: '14px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: R.btn, cursor: 'pointer', fontSize: 15, fontWeight: 'bold' }}>
+              <button onClick={saveCrop} style={{ flex: 1, padding: '14px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: DESIGN.btn, cursor: 'pointer', fontSize: 15, fontWeight: 'bold' }}>
                 {t.cropSave}
               </button>
             </div>
