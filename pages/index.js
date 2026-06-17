@@ -6,8 +6,8 @@ const C = DESIGN.colors;
 const R = DESIGN.borderRadius;
 
 const RATIOS = {
-  landscape: { label: '🖼 Querformat (A4)', value: 297 / 210 },
-  portrait:  { label: '🖼 Hochformat (A4)', value: 210 / 297 },
+  landscape: 297 / 210,
+  portrait: 210 / 297,
 };
 
 function detectLang() {
@@ -101,7 +101,7 @@ export default function Home() {
   const t = TRANSLATIONS[lang];
   const [rawPreview, setRawPreview] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
-  const [orientation, setOrientation] = useState('landscape'); // 'landscape' | 'portrait'
+  const [orientation, setOrientation] = useState('landscape');
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
@@ -113,8 +113,6 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [count, setCount] = useState(0);
   const MAX = SHOP_CONFIG.maxPreviewsPerDay;
-
-  const currentRatio = RATIOS[orientation].value;
 
   function handleUpload(e) {
     const file = e.target.files[0];
@@ -146,16 +144,6 @@ export default function Home() {
     setError(null);
   }
 
-  // Đổi orientation → mở lại crop modal với ratio mới
-  function handleOrientationChange(newOrientation) {
-    setOrientation(newOrientation);
-    if (rawPreview) {
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-      setShowCropModal(true);
-    }
-  }
-
   async function handleGenerate() {
     if (!croppedBlob || count >= MAX) return;
     setLoading(true); setError(null);
@@ -183,15 +171,6 @@ export default function Home() {
     title: { fontSize: 20, fontWeight: 'bold', color: C.text, marginBottom: 4, textAlign: 'center' },
     subtitle: { color: C.textMuted, marginBottom: 4, fontSize: 13, textAlign: 'center', lineHeight: 1.5 },
     counter: { color: C.textDim, fontSize: 12, marginBottom: 16, textAlign: 'center' },
-    // Nút chọn orientation
-    orientationRow: { display: 'flex', gap: 8, marginBottom: 14 },
-    orientationBtn: (active) => ({
-      flex: 1, padding: '10px 0', fontSize: 13, fontWeight: active ? 'bold' : 'normal',
-      background: active ? '#fff' : 'transparent',
-      color: active ? '#1a1a1a' : C.textMuted,
-      border: `1px solid ${active ? '#fff' : C.border}`,
-      borderRadius: R.btn, cursor: 'pointer',
-    }),
     uploadBox: { display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px dashed ${C.border}`, borderRadius: R.upload, padding: 16, cursor: 'pointer', marginBottom: 10, minHeight: 130, overflow: 'hidden' },
     uploadPlaceholder: { textAlign: 'center', color: C.textDim },
     previewImg: { maxWidth: '100%', maxHeight: 180, borderRadius: 4 },
@@ -202,15 +181,10 @@ export default function Home() {
     resultImg: { width: '100%', borderRadius: 4, display: 'block', marginBottom: 14 },
     buyBtn: { display: 'block', padding: '14px 0', background: C.buyBtn, color: C.buyBtnText, borderRadius: R.btn, textAlign: 'center', textDecoration: 'none', fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
     upsellNote: { textAlign: 'center', fontSize: 13, color: C.textDim, lineHeight: 1.5 },
-    // Modal — crop area lên sát trên cùng
-    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', zIndex: 1000 },
-    modalHeader: { padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
-    modalTitle: { color: '#fff', fontSize: 16, fontWeight: 'bold', margin: 0 },
-    // Crop container chiếm toàn bộ màn hình còn lại
-    cropContainer: { position: 'relative', flex: 1, background: '#000', overflow: 'hidden' },
+    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#000', display: 'flex', flexDirection: 'column', zIndex: 1000 },
+    modalHeader: { padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: '#1a1a1a' },
+    cropContainer: { position: 'relative', flex: 1, overflow: 'hidden' },
     modalFooter: { padding: '12px 16px', background: '#1a1a1a', flexShrink: 0 },
-    // Nút orientation trong modal
-    modalOrientationRow: { display: 'flex', gap: 8, marginBottom: 12 },
     sliderWrapper: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 },
     sliderLabel: { fontSize: 13, color: '#aaa', whiteSpace: 'nowrap' },
     slider: { flex: 1, accentColor: '#fff' },
@@ -229,22 +203,6 @@ export default function Home() {
 
       {!result && (
         <>
-          {/* Nút chọn ngang / dọc */}
-          <div style={s.orientationRow}>
-            <button
-              style={s.orientationBtn(orientation === 'landscape')}
-              onClick={() => handleOrientationChange('landscape')}
-            >
-              ⬛ Querformat
-            </button>
-            <button
-              style={s.orientationBtn(orientation === 'portrait')}
-              onClick={() => handleOrientationChange('portrait')}
-            >
-              📱 Hochformat
-            </button>
-          </div>
-
           <label style={s.uploadBox}>
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
             {croppedPreview
@@ -294,55 +252,45 @@ export default function Home() {
         </div>
       )}
 
-      {/* Crop Modal — full screen, crop area sát trên */}
+      {/* Crop Modal — full screen */}
       {showCropModal && (
         <div style={s.modalOverlay}>
-          {/* Header nhỏ gọn */}
+          {/* Header */}
           <div style={s.modalHeader}>
-            <h2 style={s.modalTitle}>{t.cropTitle}</h2>
-            <span style={{ color: '#888', fontSize: 13 }}>{RATIOS[orientation].label}</span>
+            <span style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>{t.cropTitle}</span>
+            {/* 1 nút nhỏ toggle ngang/dọc */}
+            <button
+              onClick={() => {
+                setOrientation(o => o === 'landscape' ? 'portrait' : 'landscape');
+                setCrop({ x: 0, y: 0 });
+                setZoom(1);
+              }}
+              style={{ padding: '5px 12px', fontSize: 12, background: 'transparent', color: '#aaa', border: '1px solid #555', borderRadius: 4, cursor: 'pointer' }}
+            >
+              {orientation === 'landscape' ? '↕ Hochformat' : '↔ Querformat'}
+            </button>
           </div>
 
-          {/* Crop area chiếm toàn màn hình */}
+          {/* Crop area — chiếm toàn bộ màn hình còn lại */}
           <div style={s.cropContainer}>
             <Cropper
               image={rawPreview}
               crop={crop}
               zoom={zoom}
-              aspect={currentRatio}
+              aspect={RATIOS[orientation]}
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onCropComplete={onCropComplete}
             />
           </div>
 
-          {/* Footer với controls */}
+          {/* Footer */}
           <div style={s.modalFooter}>
-            {/* Chuyển orientation ngay trong modal */}
-            <div style={s.modalOrientationRow}>
-              {Object.entries(RATIOS).map(([key, val]) => (
-                <button
-                  key={key}
-                  onClick={() => { setOrientation(key); setCrop({ x: 0, y: 0 }); setZoom(1); }}
-                  style={{
-                    flex: 1, padding: '8px 0', fontSize: 12,
-                    background: orientation === key ? '#fff' : 'transparent',
-                    color: orientation === key ? '#1a1a1a' : '#aaa',
-                    border: `1px solid ${orientation === key ? '#fff' : '#555'}`,
-                    borderRadius: R.btn, cursor: 'pointer',
-                  }}
-                >
-                  {val.label}
-                </button>
-              ))}
-            </div>
-
             <div style={s.sliderWrapper}>
               <span style={s.sliderLabel}>{t.zoom}</span>
               <input type="range" min={1} max={3} step={0.01} value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))} style={s.slider} />
             </div>
-
             <div style={s.modalButtons}>
               <button onClick={handleCancelCrop} style={s.cancelBtn}>{t.cropCancel}</button>
               <button onClick={handleSaveCrop} style={s.saveBtn}>{t.cropSave}</button>
