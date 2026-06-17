@@ -1,12 +1,14 @@
 import { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
 
+// A4 ngang tỉ lệ: 297/210 = 1.4142
+const A4_RATIO = 297 / 210;
+
 function getCroppedImg(imageSrc, croppedAreaPixels) {
   return new Promise((resolve) => {
     const image = new Image();
     image.src = imageSrc;
     image.onload = () => {
-      // Resize về tối đa 1024px
       const maxSize = 1024;
       let w = croppedAreaPixels.width;
       let h = croppedAreaPixels.height;
@@ -19,13 +21,43 @@ function getCroppedImg(imageSrc, croppedAreaPixels) {
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(
-        image,
-        croppedAreaPixels.x, croppedAreaPixels.y,
-        croppedAreaPixels.width, croppedAreaPixels.height,
-        0, 0, w, h
-      );
+      ctx.drawImage(image, croppedAreaPixels.x, croppedAreaPixels.y, croppedAreaPixels.width, croppedAreaPixels.height, 0, 0, w, h);
       canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+    };
+  });
+}
+
+// Crop ảnh kết quả về đúng tỉ lệ A4 ngang
+function cropToA4(imageSrc) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.src = imageSrc;
+    image.onload = () => {
+      const srcW = image.width;
+      const srcH = image.height;
+      let cropW, cropH, offsetX, offsetY;
+
+      if (srcW / srcH > A4_RATIO) {
+        // Ảnh rộng hơn A4 → crop chiều ngang
+        cropH = srcH;
+        cropW = Math.round(srcH * A4_RATIO);
+        offsetX = Math.round((srcW - cropW) / 2);
+        offsetY = 0;
+      } else {
+        // Ảnh cao hơn A4 → crop chiều dọc
+        cropW = srcW;
+        cropH = Math.round(srcW / A4_RATIO);
+        offsetX = 0;
+        offsetY = Math.round((srcH - cropH) / 2);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(image, offsetX, offsetY, cropW, cropH, 0, 0, cropW, cropH);
+      resolve(canvas.toDataURL('image/png'));
     };
   });
 }
@@ -65,9 +97,7 @@ export default function Home() {
     setZoom(1);
   }
 
-  const onCropComplete = useCallback((_, pixels) => {
-    setCroppedAreaPixels(pixels);
-  }, []);
+  const onCropComplete = useCallback((_, pixels) => setCroppedAreaPixels(pixels), []);
 
   async function handleSaveCrop() {
     const blob = await getCroppedImg(rawPreview, croppedAreaPixels);
@@ -87,8 +117,6 @@ export default function Home() {
     setError(null);
     try {
       const base64 = await blobToBase64(croppedBlob);
-      console.log('Sending base64 length:', base64.length);
-
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,7 +124,10 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Fehler');
-      setResult(data.imageUrl);
+
+      // Crop kết quả về đúng tỉ lệ A4 ngang
+      const a4Image = await cropToA4(data.imageUrl);
+      setResult(a4Image);
       setCount(c => c + 1);
     } catch (err) {
       setError(err.message);
@@ -143,11 +174,12 @@ export default function Home() {
 
         {result && (
           <div style={styles.resultBox}>
-            <p style={styles.resultLabel}>Vorschau mit Wasserzeichen:</p>
+            <p style={styles.resultLabel}>Vorschau (A4 Querformat) mit Wasserzeichen:</p>
             <div style={styles.watermarkWrapper}>
-              <img src={result} alt="Portrait" style={styles.resultImg} />
+              <img src={result} alt="Portrait A4" style={{ ...styles.resultImg, aspectRatio: '297/210' }} />
               <div style={styles.watermark}>© Sketchus</div>
             </div>
+            <p style={styles.sizeNote}>📐 Format: A4 Querformat (297 × 210 mm)</p>
             <a href="https://sketchus.de/products/bleistift-portrait" style={styles.buyBtn}>
               🛒 Vollbild kaufen für €9,99
             </a>
@@ -164,7 +196,7 @@ export default function Home() {
                 image={rawPreview}
                 crop={crop}
                 zoom={zoom}
-                aspect={16 / 9}
+                aspect={A4_RATIO}
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
                 onCropComplete={onCropComplete}
@@ -172,12 +204,8 @@ export default function Home() {
             </div>
             <div style={styles.sliderWrapper}>
               <span style={styles.sliderLabel}>🔍 Zoom</span>
-              <input
-                type="range" min={1} max={3} step={0.01}
-                value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))}
-                style={styles.slider}
-              />
+              <input type="range" min={1} max={3} step={0.01} value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))} style={styles.slider} />
             </div>
             <div style={styles.modalButtons}>
               <button onClick={handleCancelCrop} style={styles.cancelBtn}>Abbrechen</button>
@@ -192,22 +220,23 @@ export default function Home() {
 
 const styles = {
   container: { minHeight: '100vh', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: 'Georgia, serif' },
-  card: { background: '#16213e', borderRadius: 16, padding: 40, maxWidth: 600, width: '100%', color: '#eee', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' },
+  card: { background: '#16213e', borderRadius: 16, padding: 40, maxWidth: 650, width: '100%', color: '#eee', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' },
   title: { textAlign: 'center', fontSize: 28, color: '#f0c040', marginBottom: 8 },
   subtitle: { textAlign: 'center', color: '#aaa', marginBottom: 8, fontSize: 14 },
   counter: { textAlign: 'center', color: '#888', fontSize: 13, marginBottom: 24 },
-  uploadBox: { display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed #444', borderRadius: 12, padding: 20, cursor: 'pointer', marginBottom: 12, minHeight: 200, overflow: 'hidden' },
+  uploadBox: { display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed #444', borderRadius: 12, padding: 20, cursor: 'pointer', marginBottom: 12, minHeight: 180, overflow: 'hidden' },
   uploadPlaceholder: { textAlign: 'center', color: '#666' },
-  previewImg: { maxWidth: '100%', maxHeight: 300, borderRadius: 8 },
+  previewImg: { maxWidth: '100%', maxHeight: 250, borderRadius: 8 },
   reuploadBtn: { display: 'block', textAlign: 'center', color: '#4a9eff', cursor: 'pointer', marginBottom: 16, fontSize: 14 },
   btn: { width: '100%', padding: '14px 0', background: '#f0c040', color: '#1a1a2e', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 'bold', cursor: 'pointer', marginBottom: 16 },
   error: { color: '#ff6b6b', textAlign: 'center' },
   resultBox: { marginTop: 24 },
   resultLabel: { color: '#aaa', fontSize: 13, marginBottom: 8 },
   watermarkWrapper: { position: 'relative', display: 'inline-block', width: '100%' },
-  resultImg: { width: '100%', borderRadius: 8 },
+  resultImg: { width: '100%', borderRadius: 8, display: 'block' },
   watermark: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%) rotate(-30deg)', fontSize: 36, color: 'rgba(255,255,255,0.4)', fontWeight: 'bold', pointerEvents: 'none', whiteSpace: 'nowrap' },
-  buyBtn: { display: 'block', marginTop: 16, padding: '14px 0', background: '#e63946', color: '#fff', borderRadius: 8, textAlign: 'center', textDecoration: 'none', fontSize: 18, fontWeight: 'bold' },
+  sizeNote: { color: '#888', fontSize: 12, textAlign: 'center', marginTop: 8 },
+  buyBtn: { display: 'block', marginTop: 12, padding: '14px 0', background: '#e63946', color: '#fff', borderRadius: 8, textAlign: 'center', textDecoration: 'none', fontSize: 18, fontWeight: 'bold' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalBox: { background: '#16213e', borderRadius: 16, padding: 24, width: '90%', maxWidth: 700, color: '#eee' },
   modalTitle: { textAlign: 'center', marginBottom: 16, color: '#f0c040', fontSize: 20 },
