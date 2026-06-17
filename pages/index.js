@@ -76,15 +76,12 @@ function LoadingOverlay({ bgImage }) {
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
-    // Progress bar: 90 giây tổng (AI thường mất 30-60s)
     const totalMs = 55000;
     const interval = 200;
     const increment = (interval / totalMs) * 100;
-
     const timer = setInterval(() => {
       setProgress(prev => {
         const next = Math.min(prev + increment, 95);
-        // Cập nhật step dựa theo progress
         if (next < 25) setStepIndex(0);
         else if (next < 55) setStepIndex(1);
         else if (next < 80) setStepIndex(2);
@@ -92,55 +89,35 @@ function LoadingOverlay({ bgImage }) {
         return next;
       });
     }, interval);
-
     return () => clearInterval(timer);
   }, []);
 
   return (
     <div style={overlay.backdrop}>
-      {/* Blurred background image */}
-      {bgImage && (
-        <div style={{
-          ...overlay.bgImg,
-          backgroundImage: `url(${bgImage})`,
-        }} />
-      )}
+      {bgImage && <div style={{ ...overlay.bgImg, backgroundImage: `url(${bgImage})` }} />}
       <div style={overlay.box}>
         <p style={overlay.topLabel}>WIR ERSTELLEN DEIN KUNSTWERK</p>
         <h2 style={overlay.title}>{LOADING_STEPS[stepIndex]}...</h2>
-
-        {/* Progress bar */}
         <div style={overlay.barTrack}>
           <div style={{ ...overlay.barFill, width: `${progress}%` }} />
         </div>
-
-        {/* Steps */}
         <div style={overlay.steps}>
           {LOADING_STEPS.map((step, i) => (
             <div key={i} style={overlay.stepRow}>
-              <span style={{
-                ...overlay.stepIcon,
-                color: i < stepIndex ? '#fff' : i === stepIndex ? '#f0c040' : '#666',
-              }}>
+              <span style={{ ...overlay.stepIcon, color: i < stepIndex ? '#fff' : i === stepIndex ? '#f0c040' : '#666' }}>
                 {i < stepIndex ? '✓' : i === stepIndex ? '●' : '○'}
               </span>
-              <span style={{
-                ...overlay.stepText,
-                color: i < stepIndex ? '#ccc' : i === stepIndex ? '#fff' : '#555',
-                fontWeight: i === stepIndex ? 'bold' : 'normal',
-              }}>
+              <span style={{ ...overlay.stepText, color: i < stepIndex ? '#ccc' : i === stepIndex ? '#fff' : '#555', fontWeight: i === stepIndex ? 'bold' : 'normal' }}>
                 {step}
               </span>
             </div>
           ))}
         </div>
-
-        {/* Upsell text */}
         <div style={overlay.upsell}>
           <p style={overlay.upsellText}>
             Dieser Entwurf wird automatisch aus 1 Foto erstellt.<br />
             <strong>Mehrere Vorlagen?</strong> Dann lass echte Künstler dein{' '}
-<span style={{ color: '#f0c040' }}>handgezeichnetes Portrait</span> erstellen.
+            <span style={{ color: '#f0c040' }}>Sketchus Original</span> von Hand zeichnen.
           </p>
         </div>
       </div>
@@ -157,6 +134,7 @@ export default function Home() {
   const [croppedPreview, setCroppedPreview] = useState(null);
   const [croppedBlob, setCroppedBlob] = useState(null);
   const [result, setResult] = useState(null);
+  const [checkoutUrl, setCheckoutUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [count, setCount] = useState(0);
@@ -170,6 +148,7 @@ export default function Home() {
     setCroppedPreview(null);
     setCroppedBlob(null);
     setResult(null);
+    setCheckoutUrl(null);
     setError(null);
     setCrop({ x: 0, y: 0 });
     setZoom(1);
@@ -198,12 +177,13 @@ export default function Home() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64 }),
+        body: JSON.stringify({ imageBase64: base64, originalBase64: base64 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Fehler');
       const a4Image = await cropToA4(data.imageUrl);
       setResult(a4Image);
+      setCheckoutUrl(data.checkoutUrl);
       setCount(c => c + 1);
     } catch (err) {
       setError(err.message);
@@ -258,9 +238,20 @@ export default function Home() {
               <div style={styles.watermark}>© Sketchus</div>
             </div>
             <p style={styles.sizeNote}>📐 Format: A4 Querformat (297 × 210 mm)</p>
-            <a href="https://sketchus.de/products/bleistift-portrait" style={styles.buyBtn}>
-              🛒 Vollbild kaufen für €9,99
-            </a>
+
+            {/* Checkout Button */}
+            {checkoutUrl && (
+              <a href={checkoutUrl} style={styles.buyBtn}>
+                🛒 Jetzt kaufen & herunterladen — €9,99
+              </a>
+            )}
+
+            <p style={styles.upsellNote}>
+              Möchtest du ein <strong>echtes handgezeichnetes Original</strong>?{' '}
+              <a href="https://sketchus.de/collections/original-portraits" style={{ color: '#f0c040' }}>
+                Sketchus Original →
+              </a>
+            </p>
           </div>
         )}
       </div>
@@ -313,8 +304,9 @@ const styles = {
   watermarkWrapper: { position: 'relative', display: 'inline-block', width: '100%' },
   resultImg: { width: '100%', borderRadius: 8, display: 'block' },
   watermark: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%) rotate(-30deg)', fontSize: 36, color: 'rgba(255,255,255,0.4)', fontWeight: 'bold', pointerEvents: 'none', whiteSpace: 'nowrap' },
-  sizeNote: { color: '#888', fontSize: 12, textAlign: 'center', marginTop: 8 },
-  buyBtn: { display: 'block', marginTop: 12, padding: '14px 0', background: '#e63946', color: '#fff', borderRadius: 8, textAlign: 'center', textDecoration: 'none', fontSize: 18, fontWeight: 'bold' },
+  sizeNote: { color: '#888', fontSize: 12, textAlign: 'center', marginTop: 8, marginBottom: 16 },
+  buyBtn: { display: 'block', padding: '16px 0', background: '#e63946', color: '#fff', borderRadius: 8, textAlign: 'center', textDecoration: 'none', fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
+  upsellNote: { textAlign: 'center', fontSize: 13, color: '#888', marginTop: 8 },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalBox: { background: '#16213e', borderRadius: 16, padding: 24, width: '90%', maxWidth: 700, color: '#eee' },
   modalTitle: { textAlign: 'center', marginBottom: 16, color: '#f0c040', fontSize: 20 },
