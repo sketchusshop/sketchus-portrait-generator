@@ -1,4 +1,4 @@
-import OpenAI, { toFile } from 'openai';
+import OpenAI from 'openai';
 
 export const config = { api: { bodyParser: { sizeLimit: '20mb' } } };
 
@@ -11,34 +11,43 @@ export default async function handler(req, res) {
     const { imageBase64 } = req.body;
     if (!imageBase64) return res.status(400).json({ error: 'Kein Bild empfangen' });
 
-    const buffer = Buffer.from(imageBase64, 'base64');
-    console.log('Buffer size:', buffer.length);
+    // Dùng gpt-image-1 generate với vision — gửi ảnh qua messages
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+            },
+            {
+              type: 'text',
+              text: 'Describe this person in detail: face shape, hair, facial features, expression, age, clothing.',
+            },
+          ],
+        },
+      ],
+      max_tokens: 500,
+    });
 
-    const imageFile = await toFile(buffer, 'photo.png', { type: 'image/png' });
-    console.log('File name:', imageFile.name);
-    console.log('File type:', imageFile.type);
-    console.log('File size:', imageFile.size);
+    const description = response.choices[0].message.content;
 
-    const response = await openai.images.edit({
+    // Dùng mô tả để tạo ảnh bút chì
+    const imageResponse = await openai.images.generate({
       model: 'gpt-image-1',
-      image: imageFile,
-      prompt: `Convert this photo into a pencil sketch portrait. Black and white, hand-drawn style.`,
+      prompt: `A highly detailed pencil sketch portrait of: ${description}. Black and white, hand-drawn pencil drawing style, fine pencil strokes, hatching and cross-hatching shading, pure pencil on white paper. No color, no watercolor, only pencil.`,
       n: 1,
       size: '1024x1024',
     });
 
-    const imageUrl = response.data[0].url
-      || `data:image/png;base64,${response.data[0].b64_json}`;
+    const imageUrl = imageResponse.data[0].url
+      || `data:image/png;base64,${imageResponse.data[0].b64_json}`;
 
     res.status(200).json({ imageUrl });
   } catch (e) {
-    // Trả về full error để debug
-    res.status(500).json({
-      error: e.message,
-      status: e.status,
-      code: e.code,
-      type: e.type,
-      details: e.error || null,
-    });
+    console.error('Error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 }
