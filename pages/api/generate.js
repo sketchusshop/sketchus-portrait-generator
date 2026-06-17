@@ -15,11 +15,18 @@ export default async function handler(req, res) {
 
     try {
       const file = files.image[0];
-      const imageStream = fs.createReadStream(file.filepath);
+      
+      // Đọc file và tạo Blob với đúng MIME type
+      const fileBuffer = fs.readFileSync(file.filepath);
+      const mimeType = file.mimetype || 'image/jpeg';
+      const fileName = file.originalFilename || 'photo.jpg';
+      
+      const imageBlob = new Blob([fileBuffer], { type: mimeType });
+      const imageFile = new File([imageBlob], fileName, { type: mimeType });
 
       const response = await openai.images.edit({
         model: 'gpt-image-1',
-        image: imageStream,
+        image: imageFile,
         prompt: `Convert this photo into a highly detailed pencil sketch portrait. 
 Black and white, hand-drawn pencil drawing style, fine pencil strokes, 
 hatching and cross-hatching shading, realistic facial features, 
@@ -28,7 +35,8 @@ pure pencil on white paper. No color.`,
         size: '1024x1024',
       });
 
-      const imageUrl = response.data[0].url;
+      const imageUrl = response.data[0].url 
+        || `data:image/png;base64,${response.data[0].b64_json}`;
       res.status(200).json({ imageUrl });
     } catch (e) {
       console.error(e);
