@@ -1,123 +1,100 @@
-// ============================================================
-// SKETCHUS PORTRAIT GENERATOR — CONFIG
-// Chỉnh text, màu sắc, giá, link tại đây. Không cần sửa code.
-// ============================================================
-
 export const SHOP_CONFIG = {
-  // Shopify
   shopDomain: 'sketch-us.myshopify.com',
   variantId: '58043598831880',
   price: '€9,99',
-
-  // Links
   vercelUrl: 'https://sketchus-portrait-generator.vercel.app',
   originalPortraitUrl: 'https://sketchus.de/collections/original-portraits',
-
-  // Giới hạn
   maxPreviewsPerDay: 10,
-
-  // Tỉ lệ ảnh kết quả: A4 ngang = 297/210
   imageAspectRatio: 297 / 210,
-
-  // Thời gian loading ước tính (ms)
   estimatedLoadingMs: 55000,
 };
 
-// ============================================================
-// DESIGN — Chỉnh màu sắc, font, bo góc tại đây
-// ============================================================
 export const DESIGN = {
   colors: {
-    pageBg: '#1a1a2e',          // Nền trang
-    cardBg: '#16213e',          // Nền card
-    accent: '#f0c040',          // Màu vàng chính (nút, tiêu đề)
-    accentText: '#1a1a2e',      // Chữ trên nút vàng
-    buyBtn: '#e63946',          // Nút mua (đỏ)
-    buyBtnText: '#ffffff',      // Chữ nút mua
-    text: '#eeeeee',            // Chữ chính
-    textMuted: '#aaaaaa',       // Chữ phụ
-    textDim: '#888888',         // Chữ mờ
-    border: '#444444',          // Viền upload
-    linkColor: '#4a9eff',       // Link màu xanh
-    error: '#ff6b6b',           // Màu lỗi
-    overlayBg: 'rgba(22,33,62,0.85)', // Nền loading overlay
+    pageBg: 'transparent',        // Trong suốt — khớp với nền Shopify
+    cardBg: 'transparent',        // Không có card nền
+    accent: '#1a1a1a',            // Đen — màu chính Sketchus
+    accentText: '#ffffff',        // Chữ trắng trên nút đen
+    buyBtn: '#1a1a1a',            // Nút mua màu đen
+    buyBtnText: '#ffffff',
+    text: '#1a1a1a',              // Chữ đen
+    textMuted: '#555555',         // Chữ xám
+    textDim: '#888888',
+    border: '#dddddd',            // Viền xám nhạt
+    linkColor: '#1a1a1a',
+    error: '#cc0000',
+    overlayBg: 'rgba(255,255,255,0.95)', // Loading overlay trắng
   },
-  font: 'Georgia, serif',
+  font: '"Helvetica Neue", Arial, sans-serif',
   borderRadius: {
-    card: 16,
-    btn: 8,
-    upload: 12,
-    modal: 16,
+    card: 0,
+    btn: 4,
+    upload: 4,
+    modal: 8,
   },
 };
 
-// ============================================================
-// TRANSLATIONS — Chỉnh text tiếng Đức và tiếng Anh tại đây
-// ============================================================
 export const TRANSLATIONS = {
   de: {
-    title: '✏️ Bleistift-Portrait Generator',
-    subtitle: 'Lade dein Foto hoch und erhalte ein künstlerisches Bleistift-Portrait',
-    counter: (count, max) => `${count} von ${max} Vorschauen heute verwendet`,
-    upload: 'Foto hochladen (JPG, PNG, WEBP)',
-    uploadHint: 'Klicken oder Bild hierher ziehen',
-    changePhoto: '🔄 Anderes Foto wählen',
-    generate: '✏️ Portrait erstellen',
-    generating: '⏳ Wird erstellt...',
-    cropTitle: 'Bild zuschneiden',
-    cropSave: 'Speichern',
+    title: 'KI Bleistift-Portrait',
+    subtitle: 'Lade dein Foto hoch — wir erstellen dein persönliches Bleistift-Portrait',
+    counter: (count, max) => `${count} von ${max} kostenlosen Vorschauen`,
+    upload: 'Foto hochladen',
+    uploadHint: 'JPG, PNG oder WEBP · Klicken oder hierher ziehen',
+    changePhoto: 'Anderes Foto wählen',
+    generate: 'Portrait erstellen',
+    generating: 'Wird erstellt…',
+    cropTitle: 'Bildausschnitt wählen',
+    cropSave: 'Übernehmen',
     cropCancel: 'Abbrechen',
-    zoom: '🔍 Zoom',
-    resultLabel: 'Vorschau (A4 Querformat) mit Wasserzeichen:',
-    sizeNote: '📐 Format: A4 Querformat (297 × 210 mm)',
-    buyBtn: (price) => `🛒 Jetzt kaufen & wir drucken es für dich — ${price}`,
-    upsellText: 'Möchtest du ein echtes handgezeichnetes Original?',
-    upsellLink: 'Sketchus Original →',
-    loadingHeadline: 'WIR ERSTELLEN DEIN KUNSTWERK',
+    zoom: 'Zoom',
+    resultLabel: 'Vorschau mit Wasserzeichen:',
+    sizeNote: 'Format: A4 Querformat · 300 DPI druckfertig',
+    buyBtn: (price) => `Jetzt bestellen — ${price}`,
+    upsellText: 'Lieber ein echtes handgezeichnetes Original?',
+    upsellLink: 'Sketchus Original ansehen →',
+    loadingHeadline: 'Dein Portrait wird erstellt',
     loadingSteps: [
-      'Details werden analysiert',
-      'Skizze wird erstellt',
-      'Komposition wird optimiert',
+      'Foto wird analysiert',
+      'Bleistiftskizze wird erstellt',
+      'Details werden verfeinert',
       'Finalisierung',
     ],
-    loadingUpsell: (brand) => `Dieser Entwurf wird automatisch aus 1 Foto erstellt. Mehrere Vorlagen? Dann lass echte Künstler dein ${brand} Original von Hand zeichnen.`,
-    limitReached: (max) => `Du hast das Tageslimit von ${max} Vorschauen erreicht.`,
-    errorGeneric: 'Fehler beim Erstellen. Bitte versuche es erneut.',
+    loadingUpsell: (brand) => `Dieser Entwurf wird automatisch aus 1 Foto erstellt. Für ein echtes handgezeichnetes ${brand} Original — von echten Künstlern.`,
+    limitReached: (max) => `Du hast ${max} kostenlose Vorschauen verwendet.`,
+    errorGeneric: 'Fehler beim Erstellen. Bitte erneut versuchen.',
   },
   en: {
-    title: '✏️ Pencil Portrait Generator',
-    subtitle: 'Upload your photo and receive an artistic pencil portrait',
-    counter: (count, max) => `${count} of ${max} previews used today`,
-    upload: 'Upload photo (JPG, PNG, WEBP)',
-    uploadHint: 'Click or drag image here',
-    changePhoto: '🔄 Choose a different photo',
-    generate: '✏️ Create portrait',
-    generating: '⏳ Creating...',
-    cropTitle: 'Crop image',
-    cropSave: 'Save',
+    title: 'AI Pencil Portrait',
+    subtitle: 'Upload your photo — we create your personal pencil portrait',
+    counter: (count, max) => `${count} of ${max} free previews used`,
+    upload: 'Upload photo',
+    uploadHint: 'JPG, PNG or WEBP · Click or drag here',
+    changePhoto: 'Choose different photo',
+    generate: 'Create portrait',
+    generating: 'Creating…',
+    cropTitle: 'Choose crop',
+    cropSave: 'Apply',
     cropCancel: 'Cancel',
-    zoom: '🔍 Zoom',
-    resultLabel: 'Preview (A4 landscape) with watermark:',
-    sizeNote: '📐 Format: A4 landscape (297 × 210 mm)',
-    buyBtn: (price) => `🛒 Buy now & we print it for you — ${price}`,
-    upsellText: 'Want a real hand-drawn original?',
-    upsellLink: 'Sketchus Original →',
-    loadingHeadline: 'WE ARE CREATING YOUR ARTWORK',
+    zoom: 'Zoom',
+    resultLabel: 'Preview with watermark:',
+    sizeNote: 'Format: A4 landscape · 300 DPI print-ready',
+    buyBtn: (price) => `Order now — ${price}`,
+    upsellText: 'Prefer a real hand-drawn original?',
+    upsellLink: 'View Sketchus Original →',
+    loadingHeadline: 'Creating your portrait',
     loadingSteps: [
-      'Analysing details',
-      'Creating sketch',
-      'Optimising composition',
+      'Analysing photo',
+      'Creating pencil sketch',
+      'Refining details',
       'Finalising',
     ],
-    loadingUpsell: (brand) => `This draft is automatically created from 1 photo. Multiple references? Let real artists draw your ${brand} Original by hand.`,
-    limitReached: (max) => `You have reached the daily limit of ${max} previews.`,
+    loadingUpsell: (brand) => `This preview is automatically generated from 1 photo. For a real hand-drawn ${brand} Original — by real artists.`,
+    limitReached: (max) => `You have used ${max} free previews.`,
     errorGeneric: 'Error creating portrait. Please try again.',
   },
 };
 
-// ============================================================
-// AI PROMPT — Chỉnh style ảnh tại đây
-// ============================================================
 export const AI_PROMPT = `Convert this photo into a highly detailed pencil sketch portrait. 
 Black and white, hand-drawn pencil drawing style, fine pencil strokes, 
 hatching and cross-hatching shading, realistic facial features, 
