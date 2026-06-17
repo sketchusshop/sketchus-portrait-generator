@@ -6,18 +6,26 @@ function getCroppedImg(imageSrc, croppedAreaPixels) {
     const image = new Image();
     image.src = imageSrc;
     image.onload = () => {
+      // Resize về tối đa 1024px
+      const maxSize = 1024;
+      let w = croppedAreaPixels.width;
+      let h = croppedAreaPixels.height;
+      if (w > maxSize || h > maxSize) {
+        const ratio = Math.min(maxSize / w, maxSize / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
       const canvas = document.createElement('canvas');
-      canvas.width = croppedAreaPixels.width;
-      canvas.height = croppedAreaPixels.height;
+      canvas.width = w;
+      canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(
         image,
         croppedAreaPixels.x, croppedAreaPixels.y,
         croppedAreaPixels.width, croppedAreaPixels.height,
-        0, 0,
-        croppedAreaPixels.width, croppedAreaPixels.height
+        0, 0, w, h
       );
-      canvas.toBlob((blob) => resolve(blob), 'image/jpeg');
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
     };
   });
 }
@@ -79,6 +87,8 @@ export default function Home() {
     setError(null);
     try {
       const base64 = await blobToBase64(croppedBlob);
+      console.log('Sending base64 length:', base64.length);
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,7 +112,6 @@ export default function Home() {
         <p style={styles.subtitle}>Lade dein Foto hoch und erhalte ein künstlerisches Bleistift-Portrait</p>
         <p style={styles.counter}>{count} von {MAX} Vorschauen heute verwendet</p>
 
-        {/* Upload Area */}
         <label style={styles.uploadBox}>
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} style={{ display: 'none' }} />
           {croppedPreview
@@ -146,12 +155,10 @@ export default function Home() {
         )}
       </div>
 
-      {/* Crop Modal */}
       {showCropModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalBox}>
             <h2 style={styles.modalTitle}>Bild zuschneiden</h2>
-
             <div style={styles.cropContainer}>
               <Cropper
                 image={rawPreview}
@@ -163,21 +170,15 @@ export default function Home() {
                 onCropComplete={onCropComplete}
               />
             </div>
-
-            {/* Zoom Slider */}
             <div style={styles.sliderWrapper}>
               <span style={styles.sliderLabel}>🔍 Zoom</span>
               <input
-                type="range"
-                min={1}
-                max={3}
-                step={0.01}
+                type="range" min={1} max={3} step={0.01}
                 value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
                 style={styles.slider}
               />
             </div>
-
             <div style={styles.modalButtons}>
               <button onClick={handleCancelCrop} style={styles.cancelBtn}>Abbrechen</button>
               <button onClick={handleSaveCrop} style={styles.saveBtn}>Speichern</button>
@@ -207,7 +208,6 @@ const styles = {
   resultImg: { width: '100%', borderRadius: 8 },
   watermark: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%) rotate(-30deg)', fontSize: 36, color: 'rgba(255,255,255,0.4)', fontWeight: 'bold', pointerEvents: 'none', whiteSpace: 'nowrap' },
   buyBtn: { display: 'block', marginTop: 16, padding: '14px 0', background: '#e63946', color: '#fff', borderRadius: 8, textAlign: 'center', textDecoration: 'none', fontSize: 18, fontWeight: 'bold' },
-  // Modal
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalBox: { background: '#16213e', borderRadius: 16, padding: 24, width: '90%', maxWidth: 700, color: '#eee' },
   modalTitle: { textAlign: 'center', marginBottom: 16, color: '#f0c040', fontSize: 20 },
