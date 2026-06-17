@@ -3,7 +3,7 @@ import Cropper from 'react-easy-crop';
 import { SHOP_CONFIG, DESIGN, LANG } from '../config';
 
 const D = DESIGN;
-const HIST_KEY = 'sk_hist_v5';
+const HIST_KEY = 'sk_hist_v6';
 const RATIOS = { landscape: 297 / 210, portrait: 210 / 297 };
 
 function getLang() {
@@ -131,11 +131,16 @@ export default function App() {
       const b64 = await toB64(prevBlob);
       const res = await fetch('/api/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: b64 }),
+        body: JSON.stringify({ imageBase64: b64, orientation: orient }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.errGeneric);
-      const item = { previewUrl: data.previewUrl, storedUrl: data.storedUrl, orient, createdAt: new Date().toLocaleString('de-DE') };
+      const item = {
+        previewUrl: data.previewUrl,
+        storedUrl: data.storedUrl,
+        orient,
+        createdAt: new Date().toLocaleString('de-DE'),
+      };
       addHist(item); setHist(getHist()); setResult(item); setCount(c => c + 1);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -150,11 +155,9 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.cartErr);
-      setCartDone(true);
-      // Chuyển sang trang cart sau 1.5s
-      setTimeout(() => { window.top.location.href = `https://${SHOP_CONFIG.shopDomain}/cart`; }, 1500);
-    } catch (e) { setError(e.message); }
-    finally { setCartLoading(false); }
+      // Chuyển thẳng sang checkout URL có link ảnh
+      window.top.location.href = data.checkoutUrl;
+    } catch (e) { setError(e.message); setCartLoading(false); }
   }
 
   function downloadImg(url) {
@@ -170,6 +173,9 @@ export default function App() {
 
   const BR = D.btn; const F = D.font;
 
+  // Khung ảnh — dọc hay ngang theo orient
+  const isPortrait = result?.orient === 'portrait';
+
   return (
     <div style={{ minHeight: '100vh', background: D.bg, fontFamily: F, color: D.text, boxSizing: 'border-box' }}>
       {loading && <LoadingScreen bg={prevSrc} t={t} />}
@@ -184,13 +190,24 @@ export default function App() {
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
             {hist.map((item, i) => (
               <div key={i} style={{ marginBottom: 16, border: `1px solid ${D.border}`, borderRadius: 10, overflow: 'hidden' }}>
-                <img src={item.previewUrl} alt="" style={{ width: '100%', display: 'block' }} />
+                {/* Khung trong lịch sử */}
+                <div style={{ border: '8px solid #2a2a2a', background: '#fff', lineHeight: 0 }}>
+                  <img src={item.previewUrl} alt="" style={{ width: '100%', display: 'block' }} />
+                </div>
                 <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.15)' }}>
-                  <p style={{ color: D.textDim, fontSize: 11, margin: '0 0 10px' }}>#{hist.length - i} · {item.createdAt}</p>
-                  <button onClick={() => { setResult(item); setCartDone(false); setShowHist(false); }}
-                    style={{ width: '100%', padding: '11px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-                    {t.historySelect}
-                  </button>
+                  <p style={{ color: D.textDim, fontSize: 11, margin: '0 0 10px' }}>
+                    #{hist.length - i} · {item.orient === 'portrait' ? '↕' : '↔'} · {item.createdAt}
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => { setResult(item); setCartDone(false); setShowHist(false); }}
+                      style={{ flex: 1, padding: '11px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+                      {t.historySelect}
+                    </button>
+                    <button onClick={() => { setShowHist(false); addToCart(item); }}
+                      style={{ flex: 1, padding: '11px 0', background: 'transparent', color: D.text, border: `1px solid ${D.border}`, borderRadius: BR, fontSize: 13, cursor: 'pointer' }}>
+                      {t.addToCart}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -227,12 +244,12 @@ export default function App() {
       )}
 
       {/* Main */}
-      <div style={{ padding: '20px 16px 48px' }}>
+      <div style={{ padding: '20px 16px 48px', maxWidth: 480, margin: '0 auto' }}>
         <h1 style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 4 }}>{t.title}</h1>
         <p style={{ fontSize: 13, color: D.textMuted, textAlign: 'center', marginBottom: 4, lineHeight: 1.5 }}>{t.sub}</p>
         <p style={{ fontSize: 12, color: D.textDim, textAlign: 'center', marginBottom: 24 }}>{t.counter(count, MAX)}</p>
 
-        {/* Step 1 — Upload */}
+        {/* Step 1 */}
         <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 8 }}>① Foto hochladen</p>
         <label style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(0,0,0,0.15)', border: `1px solid ${D.border}`, borderRadius: 10, padding: 12, cursor: 'pointer', marginBottom: 20 }}>
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} style={{ display: 'none' }} />
@@ -246,7 +263,7 @@ export default function App() {
           </div>
         </label>
 
-        {/* Step 2 — Generate */}
+        {/* Step 2 */}
         <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 8 }}>② Vorschau erstellen</p>
         <button onClick={generate} disabled={!prevBlob || loading || count >= MAX}
           style={{ width: '100%', padding: '15px 0', background: prevBlob && count < MAX ? '#fff' : 'rgba(255,255,255,0.25)', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 16, fontWeight: 'bold', cursor: prevBlob && count < MAX ? 'pointer' : 'not-allowed', marginBottom: 8, fontFamily: F }}>
@@ -255,54 +272,61 @@ export default function App() {
         {count >= MAX && <p style={{ color: D.error, textAlign: 'center', fontSize: 13, marginBottom: 8 }}>{t.limitMsg(MAX)}</p>}
         {error && <p style={{ color: D.error, textAlign: 'center', fontSize: 13, marginBottom: 8 }}>{error}</p>}
 
-               {/* Step 3 — Result */}
+        {/* Step 3 — Result */}
         {result && (
           <div style={{ marginTop: 24 }}>
-            <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 8 }}>③ Dein Portrait</p>
+            <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 12 }}>③ Dein Portrait</p>
 
-            {/* Ảnh trong khung — ngang hoặc dọc */}
+            {/* Khung ảnh — tự động dọc/ngang */}
             <div style={{ position: 'relative', marginBottom: 16 }}>
-              {/* Khung ảnh */}
+              {/* Outer frame */}
               <div style={{
-                border: '12px solid #2a2a2a',
-                borderRadius: 4,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 2px #555',
-                overflow: 'hidden',
-                background: '#fff',
-                lineHeight: 0,
+                padding: isPortrait ? '16px 24px' : '24px 16px',
+                background: '#1a1a1a',
+                borderRadius: 6,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
               }}>
-                <img src={result.previewUrl} alt="Portrait"
-                  style={{ width: '100%', display: 'block' }} />
+                {/* Inner mat */}
+                <div style={{
+                  padding: 8,
+                  background: '#f5f0e8',
+                  lineHeight: 0,
+                }}>
+                  <img
+                    src={result.previewUrl}
+                    alt="Portrait"
+                    style={{ width: '100%', display: 'block' }}
+                  />
+                </div>
               </div>
 
-              {/* Nút tải góc trên phải */}
+              {/* Nút tải — góc trên phải */}
               <button
                 onClick={() => downloadImg(result.storedUrl)}
                 style={{
-                  position: 'absolute', top: 16, right: 16,
-                  padding: '8px 12px', fontSize: 12, fontWeight: 'bold',
-                  background: 'rgba(0,0,0,0.7)', color: '#fff',
-                  border: '1px solid rgba(255,255,255,0.4)',
-                  borderRadius: 6, cursor: 'pointer', backdropFilter: 'blur(4px)',
+                  position: 'absolute', top: 8, right: 8,
+                  padding: '7px 12px', fontSize: 12, fontWeight: 'bold',
+                  background: 'rgba(0,0,0,0.75)', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: 6, cursor: 'pointer',
                 }}
               >
                 {t.download}
               </button>
             </div>
 
-            <p style={{ fontSize: 11, color: D.textDim, textAlign: 'center', marginBottom: 16 }}>{result.createdAt}</p>
+            <p style={{ fontSize: 11, color: D.textDim, textAlign: 'center', marginBottom: 16 }}>
+              {result.orient === 'portrait' ? '↕ Hochformat' : '↔ Querformat'} · {result.createdAt}
+            </p>
 
-            {/* Nút thêm vào giỏ hàng */}
-            {cartDone ? (
-              <div style={{ background: 'rgba(100,200,100,0.2)', border: '1px solid rgba(100,200,100,0.5)', borderRadius: 8, padding: '14px', textAlign: 'center', marginBottom: 10 }}>
-                <p style={{ margin: 0, color: '#7fff7f', fontWeight: 'bold', fontSize: 15 }}>{t.cartSuccess}</p>
-              </div>
-            ) : (
-              <button onClick={() => addToCart(result)} disabled={cartLoading}
-                style={{ width: '100%', padding: '15px 0', background: cartLoading ? 'rgba(255,255,255,0.5)' : '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 16, fontWeight: 'bold', cursor: cartLoading ? 'not-allowed' : 'pointer', marginBottom: 10, fontFamily: F }}>
-                {cartLoading ? t.addingToCart : t.addToCart}
-              </button>
-            )}
+            {/* Nút In den Warenkorb */}
+            <button
+              onClick={() => addToCart(result)}
+              disabled={cartLoading}
+              style={{ width: '100%', padding: '15px 0', background: cartLoading ? 'rgba(255,255,255,0.5)' : '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 16, fontWeight: 'bold', cursor: cartLoading ? 'not-allowed' : 'pointer', marginBottom: 10, fontFamily: F }}
+            >
+              {cartLoading ? t.addingToCart : t.addToCart}
+            </button>
 
             {/* Nút tạo lại */}
             <button onClick={reset}
@@ -321,10 +345,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Nút lịch sử */}
+        {/* History button */}
         {hist.length > 0 && (
           <button onClick={() => setShowHist(true)}
-            style={{ width: '100%', padding: '12px 0', background: 'transparent', color: D.textDim, border: `1px solid rgba(255,255,255,0.15)`, borderRadius: BR, fontSize: 14, cursor: 'pointer', fontFamily: F, marginTop: result ? 16 : 0 }}>
+            style={{ width: '100%', padding: '12px 0', background: 'transparent', color: D.textDim, border: `1px solid rgba(255,255,255,0.15)`, borderRadius: BR, fontSize: 14, cursor: 'pointer', fontFamily: F, marginTop: 16 }}>
             {t.history(hist.length)}
           </button>
         )}
