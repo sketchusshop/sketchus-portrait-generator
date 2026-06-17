@@ -58,6 +58,9 @@ export const TRANSLATIONS = {
     loadingUpsell: () => 'Diese Vorschau wird automatisch erstellt. Für ein echtes handgezeichnetes Original — von echten Künstlern für dich persönlich gezeichnet.',
     limitReached: (max) => `Du hast ${max} kostenlose Vorschauen verwendet.`,
     errorGeneric: 'Fehler beim Erstellen. Bitte erneut versuchen.',
+    historyTitle: 'Zuletzt erstellte Portraits',
+historyBtn: 'Frühere Vorschauen',
+historySelect: 'Diese auswählen',
   },
   en: {
     title: 'Pencil Portrait Preview',
@@ -87,6 +90,9 @@ export const TRANSLATIONS = {
     loadingUpsell: () => 'This preview is generated automatically. For a real hand-drawn original — drawn personally for you by real artists.',
     limitReached: (max) => `You have used ${max} free previews.`,
     errorGeneric: 'Error creating preview. Please try again.',
+historyTitle: 'Recently created portraits',
+historyBtn: 'Previous previews',
+historySelect: 'Select this one',
   },
 };
 
