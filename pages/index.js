@@ -22,12 +22,24 @@ function getCroppedImg(imageSrc, croppedAreaPixels) {
   });
 }
 
+function blobToBase64(blob) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function Home() {
   const [preview, setPreview] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [cropped, setCropped] = useState(false);
+  const [croppedBlob, setCroppedBlob] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,6 +51,7 @@ export default function Home() {
     if (!file) return;
     setPreview(URL.createObjectURL(file));
     setCropped(false);
+    setCroppedBlob(null);
     setResult(null);
     setError(null);
   }
@@ -49,6 +62,7 @@ export default function Home() {
 
   async function handleCrop() {
     const blob = await getCroppedImg(preview, croppedAreaPixels);
+    setCroppedBlob(blob);
     setPreview(URL.createObjectURL(blob));
     setCropped(true);
   }
@@ -58,10 +72,14 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const blob = await getCroppedImg(preview, croppedAreaPixels || { x: 0, y: 0, width: 512, height: 512 });
-      const formData = new FormData();
-      formData.append('image', blob, 'photo.jpg');
-      const res = await fetch('/api/generate', { method: 'POST', body: formData });
+      const blob = croppedBlob || await getCroppedImg(preview, croppedAreaPixels || { x: 0, y: 0, width: 512, height: 512 });
+      const base64 = await blobToBase64(blob);
+      
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Fehler');
       setResult(data.imageUrl);
