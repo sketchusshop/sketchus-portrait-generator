@@ -9,20 +9,20 @@ export default async function handler(req, res) {
 
   try {
     const { imageBase64 } = req.body;
-
-    if (!imageBase64) {
-      return res.status(400).json({ error: 'Kein Bild empfangen' });
-    }
+    if (!imageBase64) return res.status(400).json({ error: 'Kein Bild empfangen' });
 
     const buffer = Buffer.from(imageBase64, 'base64');
+    console.log('Buffer size:', buffer.length);
 
-    // Dùng toFile() từ OpenAI SDK — giữ đúng MIME type
-    const imageFile = await toFile(buffer, 'photo.jpg', { type: 'image/jpeg' });
+    const imageFile = await toFile(buffer, 'photo.png', { type: 'image/png' });
+    console.log('File name:', imageFile.name);
+    console.log('File type:', imageFile.type);
+    console.log('File size:', imageFile.size);
 
     const response = await openai.images.edit({
       model: 'gpt-image-1',
       image: imageFile,
-      prompt: `Convert this photo into a highly detailed pencil sketch portrait. Black and white, hand-drawn pencil drawing style, fine pencil strokes, hatching and cross-hatching shading, realistic facial features, pure pencil on white paper. No color.`,
+      prompt: `Convert this photo into a pencil sketch portrait. Black and white, hand-drawn style.`,
       n: 1,
       size: '1024x1024',
     });
@@ -32,7 +32,13 @@ export default async function handler(req, res) {
 
     res.status(200).json({ imageUrl });
   } catch (e) {
-    console.error('Error:', e);
-    res.status(500).json({ error: 'OpenAI Fehler: ' + e.message });
+    // Trả về full error để debug
+    res.status(500).json({
+      error: e.message,
+      status: e.status,
+      code: e.code,
+      type: e.type,
+      details: e.error || null,
+    });
   }
 }
