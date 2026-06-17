@@ -6,14 +6,15 @@ async function uploadToImgBB(base64Data) {
   const formData = new URLSearchParams();
   formData.append('key', process.env.IMGBB_API_KEY);
   formData.append('image', base64Data);
-  formData.append('expiration', '2592000'); // 30 Tage
+  formData.append('expiration', '15552000'); // 180 ngày
 
   const res = await fetch('https://api.imgbb.com/1/upload', {
     method: 'POST',
     body: formData,
   });
   const data = await res.json();
-  if (!data.success) throw new Error('ImgBB upload failed');
+  console.log('ImgBB response:', JSON.stringify(data));
+  if (!data.success) throw new Error('ImgBB upload failed: ' + JSON.stringify(data));
   return data.data.url;
 }
 
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
     const { imageBase64, originalBase64 } = req.body;
     if (!imageBase64) return res.status(400).json({ error: 'Kein Bild empfangen' });
 
+    // Gọi OpenAI
     const buffer = Buffer.from(imageBase64, 'base64');
     const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
 
@@ -47,33 +49,35 @@ export default async function handler(req, res) {
     const data = await response.json();
     if (!response.ok) return res.status(500).json({ error: data.error?.message || 'OpenAI Fehler' });
 
-    const imageUrl = data.data[0].url || `data:image/png;base64,${data.data[0].b64_json}`;
-
-    // Lấy base64 từ OpenAI response hoặc fetch từ URL
+    // Lấy base64 từ OpenAI
     let aiBase64;
     if (data.data[0].b64_json) {
       aiBase64 = data.data[0].b64_json;
     } else {
-      const aiRes = await fetch(imageUrl);
-      const aiBuffer = Buffer.from(await aiRes.arrayBuffer());
-      aiBase64 = aiBuffer.toString('base64');
+      const aiRes = await fetch(data.data[0].url);
+      aiBase64 = Buffer.from(await aiRes.arrayBuffer()).toString('base64');
     }
 
-    // Upload lên ImgBB
+    const imageUrl = data.data[0].url || `data:image/png;base64,${aiBase64}`;
+
+    // Upload lên ImgBB song song
     const [aiStoredUrl, originalStoredUrl] = await Promise.all([
       uploadToImgBB(aiBase64),
       originalBase64 ? uploadToImgBB(originalBase64) : Promise.resolve(null),
     ]);
 
-    // Checkout URL — gắn vào LINE ITEM PROPERTIES
+    // Gắn link vào LINE ITEM PROPERTIES — hiện trong đơn hàng Shopify
     const params = new URLSearchParams();
-    params.append('properties[🖼 Portrait-Datei]', aiStoredUrl);
-    if (originalStoredUrl) params.append('properties[📷 Originalfoto]', originalStoredUrl);
+    params.append('properties[🖼 Portrait herunterladen]', aiStoredUrl);
+    if (originalStoredUrl) {
+      params.append('properties[📷 Originalfoto]', originalStoredUrl);
+    }
     params.append('properties[Erstellt am]', new Date().toLocaleString('de-DE'));
 
     const checkoutUrl = `https://${SHOP_CONFIG.shopDomain}/cart/${SHOP_CONFIG.variantId}:1?${params.toString()}`;
 
     res.status(200).json({ imageUrl, checkoutUrl });
+
   } catch (e) {
     console.error('Error:', e.message);
     res.status(500).json({ error: e.message });
