@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
     const imageUrl = data.data[0].url || `data:image/png;base64,${data.data[0].b64_json}`;
 
-    // Lưu ảnh AI lên Vercel Blob
+    // Lưu ảnh AI lên Vercel Blob (link vĩnh viễn)
     const aiImageRes = await fetch(imageUrl);
     const aiImageBuffer = Buffer.from(await aiImageRes.arrayBuffer());
     const timestamp = Date.now();
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       contentType: 'image/png',
     });
 
-    // Lưu ảnh gốc lên Vercel Blob
+    // Lưu ảnh gốc của khách lên Vercel Blob
     let originalBlobUrl = null;
     if (originalBase64) {
       const origBuffer = Buffer.from(originalBase64, 'base64');
@@ -61,16 +61,19 @@ export default async function handler(req, res) {
       originalBlobUrl = origBlob.url;
     }
 
-    // Tạo Shopify Checkout URL với line item properties
-    const checkoutUrl = `https://${SHOP_DOMAIN}/cart/${VARIANT_ID}:1?` +
-      `attributes[ai_portrait]=${encodeURIComponent(aiBlob.url)}` +
-      (originalBlobUrl ? `&attributes[original_photo]=${encodeURIComponent(originalBlobUrl)}` : '') +
-      `&attributes[created_at]=${encodeURIComponent(new Date().toISOString())}`;
+    // Checkout URL — ảnh gắn vào LINE ITEM PROPERTIES
+    // Hiện trong đơn hàng Shopify dưới tên sản phẩm, có thể click tải
+    const params = new URLSearchParams();
+    params.append('properties[🖼 Bleistift-Portrait]', aiBlob.url);
+    if (originalBlobUrl) {
+      params.append('properties[📷 Originalfoto]', originalBlobUrl);
+    }
+    params.append('properties[Erstellt am]', new Date().toLocaleString('de-DE'));
+
+    const checkoutUrl = `https://${SHOP_DOMAIN}/cart/${VARIANT_ID}:1?${params.toString()}`;
 
     res.status(200).json({
       imageUrl,
-      aiStoredUrl: aiBlob.url,
-      originalStoredUrl: originalBlobUrl,
       checkoutUrl,
     });
   } catch (e) {
