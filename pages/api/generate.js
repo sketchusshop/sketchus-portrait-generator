@@ -33,7 +33,10 @@ export default async function handler(req, res) {
 
     const aiRes = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': `multipart/form-data; boundary=${b}` },
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': `multipart/form-data; boundary=${b}`,
+      },
       body,
     });
     const aiData = await aiRes.json();
