@@ -17,9 +17,13 @@ export default async function handler(req, res) {
       const file = files.image[0];
       const imageStream = fs.createReadStream(file.filepath);
 
-      const response = await openai.images.generate({
+      const response = await openai.images.edit({
         model: 'gpt-image-1',
-        prompt: `Transform this photo into a detailed pencil sketch portrait. Black and white, hand-drawn pencil drawing style, fine artistic lines, realistic shading, high detail. The subject is: ${file.originalFilename}`,
+        image: imageStream,
+        prompt: `Convert this photo into a highly detailed pencil sketch portrait. 
+Black and white, hand-drawn pencil drawing style, fine pencil strokes, 
+hatching and cross-hatching shading, realistic facial features, 
+pure pencil on white paper. No color.`,
         n: 1,
         size: '1024x1024',
       });
