@@ -3,7 +3,7 @@ import Cropper from 'react-easy-crop';
 import { SHOP_CONFIG, DESIGN, LANG } from '../config';
 
 const D = DESIGN;
-const HIST_KEY = 'sk_hist_v4';
+const HIST_KEY = 'sk_hist_v5';
 const RATIOS = { landscape: 297 / 210, portrait: 210 / 297 };
 
 function getLang() {
@@ -38,38 +38,44 @@ function cropImg(src, px) {
 }
 
 function toB64(blob) {
-  return new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result.split(',')[1]); r.readAsDataURL(blob); });
+  return new Promise(res => {
+    const r = new FileReader();
+    r.onloadend = () => res(r.result.split(',')[1]);
+    r.readAsDataURL(blob);
+  });
 }
 
-// Lưu link ảnh vào sessionStorage để theme Shopify đọc
-function savePortraitUrl(url) {
-  try { sessionStorage.setItem('portrait_url', url); } catch {}
-}
-
-function LoadingScreen({ bg, steps, headline, note }) {
+function LoadingScreen({ bg, t }) {
   const [pct, setPct] = useState(0);
   const [step, setStep] = useState(0);
   useEffect(() => {
     const tick = 250, inc = (tick / SHOP_CONFIG.estimatedMs) * 100;
-    const id = setInterval(() => setPct(p => { const n = Math.min(p+inc, 95); setStep(n<25?0:n<55?1:n<80?2:3); return n; }), tick);
+    const id = setInterval(() => setPct(p => {
+      const n = Math.min(p + inc, 95);
+      setStep(n < 25 ? 0 : n < 55 ? 1 : n < 80 ? 2 : 3);
+      return n;
+    }), tick);
     return () => clearInterval(id);
   }, []);
+
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(70,70,70,0.98)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-      {bg && <div style={{ position:'absolute', inset:0, backgroundImage:`url(${bg})`, backgroundSize:'cover', backgroundPosition:'center', filter:'blur(20px) brightness(0.12)', transform:'scale(1.1)' }} />}
-      <div style={{ position:'relative', width:'88%', maxWidth:340, textAlign:'center', color:'#fff', fontFamily:D.font }}>
-        <p style={{ fontSize:10, letterSpacing:3, color:D.textDim, textTransform:'uppercase', marginBottom:10 }}>{headline}</p>
-        <h2 style={{ fontSize:18, fontWeight:'bold', marginBottom:20 }}>{steps[step]}…</h2>
-        <div style={{ background:'rgba(255,255,255,0.15)', borderRadius:99, height:3, marginBottom:24, overflow:'hidden' }}>
-          <div style={{ height:'100%', background:'#fff', width:`${pct}%`, transition:'width 0.25s', borderRadius:99 }} />
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#636363', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {bg && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(20px) brightness(0.25)', transform: 'scale(1.1)' }} />}
+      <div style={{ position: 'relative', width: '88%', maxWidth: 340, textAlign: 'center', color: '#fff', fontFamily: D.font }}>
+        <p style={{ fontSize: 10, letterSpacing: 3, color: D.textDim, textTransform: 'uppercase', marginBottom: 10 }}>WIRD ERSTELLT</p>
+        <h2 style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 20 }}>{t.loadingSteps[step]}…</h2>
+        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 24, overflow: 'hidden' }}>
+          <div style={{ height: '100%', background: '#fff', width: `${pct}%`, transition: 'width 0.25s', borderRadius: 99 }} />
         </div>
-        {steps.map((s,i) => (
-          <div key={i} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8, textAlign:'left' }}>
-            <span style={{ width:18, textAlign:'center', fontSize:12, color: i<=step?'#fff':'rgba(255,255,255,0.2)' }}>{i<step?'✓':i===step?'●':'○'}</span>
-            <span style={{ fontSize:13, color: i===step?'#fff':i<step?D.textMuted:'rgba(255,255,255,0.2)', fontWeight:i===step?'bold':'normal' }}>{s}</span>
+        {t.loadingSteps.map((s, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, textAlign: 'left' }}>
+            <span style={{ width: 18, textAlign: 'center', fontSize: 12, color: i <= step ? '#fff' : 'rgba(255,255,255,0.2)' }}>
+              {i < step ? '✓' : i === step ? '●' : '○'}
+            </span>
+            <span style={{ fontSize: 13, color: i === step ? '#fff' : i < step ? D.textMuted : 'rgba(255,255,255,0.2)', fontWeight: i === step ? 'bold' : 'normal' }}>{s}</span>
           </div>
         ))}
-        <p style={{ fontSize:12, color:D.textDim, marginTop:20, lineHeight:1.5, borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:16 }}>{note}</p>
+        <p style={{ fontSize: 12, color: D.textDim, marginTop: 20, lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>{t.loadingNote}</p>
       </div>
     </div>
   );
@@ -78,19 +84,20 @@ function LoadingScreen({ bg, steps, headline, note }) {
 export default function App() {
   const lang = useRef(getLang()).current;
   const t = LANG[lang];
-  const steps = [t.loading0, t.loading1, t.loading2, t.loading3];
 
   const [rawSrc, setRawSrc] = useState(null);
   const [showCrop, setShowCrop] = useState(false);
   const [orient, setOrient] = useState('landscape');
-  const [crop, setCrop] = useState({ x:0, y:0 });
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [cropPx, setCropPx] = useState(null);
   const [prevSrc, setPrevSrc] = useState(null);
   const [prevBlob, setPrevBlob] = useState(null);
 
-  const [result, setResult] = useState(null); // { previewUrl, storedUrl, createdAt }
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [cartLoading, setCartLoading] = useState(false);
+  const [cartDone, setCartDone] = useState(false);
   const [error, setError] = useState(null);
   const [count, setCount] = useState(0);
   const [hist, setHist] = useState([]);
@@ -103,8 +110,9 @@ export default function App() {
   function handleFile(e) {
     const f = e.target.files?.[0]; if (!f) return;
     setRawSrc(URL.createObjectURL(f));
-    setPrevSrc(null); setPrevBlob(null); setResult(null); setError(null);
-    setCrop({ x:0, y:0 }); setZoom(1); setShowCrop(true);
+    setPrevSrc(null); setPrevBlob(null); setResult(null);
+    setError(null); setCartDone(false);
+    setCrop({ x: 0, y: 0 }); setZoom(1); setShowCrop(true);
   }
 
   const onCropDone = useCallback((_, px) => setCropPx(px), []);
@@ -118,7 +126,7 @@ export default function App() {
 
   async function generate() {
     if (!prevBlob || count >= MAX) return;
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setCartDone(false);
     try {
       const b64 = await toB64(prevBlob);
       const res = await fetch('/api/generate', {
@@ -127,56 +135,60 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.errGeneric);
-
-      const item = { previewUrl: data.previewUrl, storedUrl: data.storedUrl, createdAt: new Date().toLocaleString('de-DE') };
-      addHist(item); setHist(getHist());
-      setResult(item); setCount(c => c+1);
-
-      // Lưu link vào sessionStorage — theme Shopify sẽ đọc
-      savePortraitUrl(data.storedUrl);
-
-    } catch(e) { setError(e.message); }
+      const item = { previewUrl: data.previewUrl, storedUrl: data.storedUrl, orient, createdAt: new Date().toLocaleString('de-DE') };
+      addHist(item); setHist(getHist()); setResult(item); setCount(c => c + 1);
+    } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
 
-  function selectFromHist(item) {
-    setResult(item); setShowHist(false);
-    savePortraitUrl(item.storedUrl);
+  async function addToCart(item) {
+    setCartLoading(true); setError(null);
+    try {
+      const res = await fetch('/api/cart-add', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variantId: SHOP_CONFIG.variantId, portraitUrl: item.storedUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t.cartErr);
+      setCartDone(true);
+      // Chuyển sang trang cart sau 1.5s
+      setTimeout(() => { window.top.location.href = `https://${SHOP_CONFIG.shopDomain}/cart`; }, 1500);
+    } catch (e) { setError(e.message); }
+    finally { setCartLoading(false); }
+  }
+
+  function downloadImg(url) {
+    const a = document.createElement('a');
+    a.href = url; a.download = 'portrait-sketchus.jpg';
+    a.target = '_blank'; a.click();
   }
 
   function reset() {
-    setResult(null); setError(null);
+    setResult(null); setError(null); setCartDone(false);
     setPrevSrc(null); setPrevBlob(null); setRawSrc(null);
   }
 
-  const BR = D.btn;
-  const F = D.font;
-
-  const sBtn = (bg, color, border) => ({
-    width:'100%', padding:'14px 0', background:bg, color, border:border||'none',
-    borderRadius:BR, fontSize:15, fontWeight:'bold', cursor:'pointer', fontFamily:F,
-    marginBottom:10,
-  });
+  const BR = D.btn; const F = D.font;
 
   return (
-    <div style={{ minHeight:'100vh', background:D.bg, fontFamily:F, color:D.text, boxSizing:'border-box' }}>
-      {loading && <LoadingScreen bg={prevSrc} steps={steps} headline={t.generating} note={t.upsell} />}
+    <div style={{ minHeight: '100vh', background: D.bg, fontFamily: F, color: D.text, boxSizing: 'border-box' }}>
+      {loading && <LoadingScreen bg={prevSrc} t={t} />}
 
-      {/* ── History Panel ── */}
+      {/* History Panel */}
       {showHist && (
-        <div style={{ position:'fixed', inset:0, zIndex:1500, background:D.bg, display:'flex', flexDirection:'column' }}>
-          <div style={{ padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:`1px solid ${D.border}`, flexShrink:0 }}>
-            <span style={{ fontWeight:'bold', fontSize:16 }}>{t.historyTitle} ({hist.length})</span>
-            <button onClick={() => setShowHist(false)} style={{ background:'none', border:'none', color:D.textMuted, fontSize:26, cursor:'pointer' }}>✕</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1500, background: D.bg, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${D.border}`, flexShrink: 0 }}>
+            <span style={{ fontWeight: 'bold', fontSize: 16 }}>{t.historyTitle} ({hist.length})</span>
+            <button onClick={() => setShowHist(false)} style={{ background: 'none', border: 'none', color: D.textMuted, fontSize: 26, cursor: 'pointer' }}>✕</button>
           </div>
-          <div style={{ flex:1, overflowY:'auto', padding:16 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
             {hist.map((item, i) => (
-              <div key={i} style={{ marginBottom:16, border:`1px solid ${D.border}`, borderRadius:10, overflow:'hidden' }}>
-                <img src={item.previewUrl} alt="" style={{ width:'100%', display:'block' }} />
-                <div style={{ padding:'10px 12px', background:'rgba(0,0,0,0.15)' }}>
-                  <p style={{ color:D.textDim, fontSize:11, margin:'0 0 10px' }}>#{hist.length-i} · {item.createdAt}</p>
-                  <button onClick={() => selectFromHist(item)}
-                    style={{ ...sBtn('#fff','#1a1a1a'), marginBottom:0 }}>
+              <div key={i} style={{ marginBottom: 16, border: `1px solid ${D.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                <img src={item.previewUrl} alt="" style={{ width: '100%', display: 'block' }} />
+                <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.15)' }}>
+                  <p style={{ color: D.textDim, fontSize: 11, margin: '0 0 10px' }}>#{hist.length - i} · {item.createdAt}</p>
+                  <button onClick={() => { setResult(item); setCartDone(false); setShowHist(false); }}
+                    style={{ width: '100%', padding: '11px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
                     {t.historySelect}
                   </button>
                 </div>
@@ -186,106 +198,61 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Crop Modal ── */}
+      {/* Crop Modal */}
       {showCrop && (
-        <div style={{ position:'fixed', inset:0, background:D.bg, display:'flex', flexDirection:'column', zIndex:1000 }}>
-          <div style={{ padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-            <span style={{ fontSize:15, fontWeight:'bold' }}>{t.cropTitle}</span>
-            <button onClick={() => { setOrient(o => o==='landscape'?'portrait':'landscape'); setCrop({x:0,y:0}); setZoom(1); }}
-              style={{ padding:'6px 14px', fontSize:12, background:'transparent', color:D.textMuted, border:`1px solid ${D.border}`, borderRadius:4, cursor:'pointer' }}>
-              {orient==='landscape' ? t.portrait : t.landscape}
+        <div style={{ position: 'fixed', inset: 0, background: D.bg, display: 'flex', flexDirection: 'column', zIndex: 1000 }}>
+          <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 'bold' }}>{t.cropTitle}</span>
+            <button onClick={() => { setOrient(o => o === 'landscape' ? 'portrait' : 'landscape'); setCrop({ x: 0, y: 0 }); setZoom(1); }}
+              style={{ padding: '6px 14px', fontSize: 12, background: 'transparent', color: D.textMuted, border: `1px solid ${D.border}`, borderRadius: 4, cursor: 'pointer' }}>
+              {orient === 'landscape' ? t.toPortrait : t.toLandscape}
             </button>
           </div>
-          <div style={{ position:'relative', flex:1, margin:'0 16px', borderRadius:8, overflow:'hidden', background:'#3a3a3a', minHeight:0 }}>
+          <div style={{ position: 'relative', flex: 1, margin: '0 16px', borderRadius: 8, overflow: 'hidden', background: '#4a4a4a', minHeight: 0 }}>
             <Cropper image={rawSrc} crop={crop} zoom={zoom} aspect={RATIOS[orient]}
               onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropDone} />
           </div>
-          <div style={{ padding:'14px 16px 36px', flexShrink:0 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
-              <span style={{ fontSize:13, color:D.textMuted, whiteSpace:'nowrap' }}>{t.zoom}</span>
+          <div style={{ padding: '14px 16px 36px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: D.textMuted, whiteSpace: 'nowrap' }}>{t.zoom}</span>
               <input type="range" min={1} max={3} step={0.01} value={zoom}
-                onChange={e => setZoom(Number(e.target.value))} style={{ flex:1, accentColor:'#fff' }} />
+                onChange={e => setZoom(Number(e.target.value))} style={{ flex: 1, accentColor: '#fff' }} />
             </div>
-            <div style={{ display:'flex', gap:10 }}>
-              <button onClick={cancelCrop} style={{ flex:1, padding:'14px 0', background:'transparent', border:`1px solid ${D.border}`, color:D.textMuted, borderRadius:BR, cursor:'pointer', fontSize:15 }}>{t.cropCancel}</button>
-              <button onClick={saveCrop} style={{ flex:1, padding:'14px 0', background:'#fff', color:'#1a1a1a', border:'none', borderRadius:BR, cursor:'pointer', fontSize:15, fontWeight:'bold' }}>{t.cropSave}</button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={cancelCrop} style={{ flex: 1, padding: '14px 0', background: 'transparent', border: `1px solid ${D.border}`, color: D.textMuted, borderRadius: BR, cursor: 'pointer', fontSize: 15 }}>{t.cropCancel}</button>
+              <button onClick={saveCrop} style={{ flex: 1, padding: '14px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, cursor: 'pointer', fontSize: 15, fontWeight: 'bold' }}>{t.cropSave}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Main ── */}
-      <div style={{ padding:'20px 16px 48px' }}>
-        <h1 style={{ fontSize:20, fontWeight:'bold', textAlign:'center', marginBottom:4 }}>{t.title}</h1>
-        <p style={{ fontSize:13, color:D.textMuted, textAlign:'center', marginBottom:4, lineHeight:1.5 }}>{t.sub}</p>
-        <p style={{ fontSize:12, color:D.textDim, textAlign:'center', marginBottom:24 }}>{t.counter(count, MAX)}</p>
+      {/* Main */}
+      <div style={{ padding: '20px 16px 48px' }}>
+        <h1 style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 4 }}>{t.title}</h1>
+        <p style={{ fontSize: 13, color: D.textMuted, textAlign: 'center', marginBottom: 4, lineHeight: 1.5 }}>{t.sub}</p>
+        <p style={{ fontSize: 12, color: D.textDim, textAlign: 'center', marginBottom: 24 }}>{t.counter(count, MAX)}</p>
 
         {/* Step 1 — Upload */}
-        <p style={{ fontSize:11, letterSpacing:2, color:D.textDim, textTransform:'uppercase', marginBottom:8 }}>① {lang==='de'?'Foto hochladen':'Upload photo'}</p>
-        <label style={{ display:'flex', alignItems:'center', gap:12, background:'rgba(0,0,0,0.15)', border:`1px solid ${D.border}`, borderRadius:10, padding:12, cursor:'pointer', marginBottom:20 }}>
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} style={{ display:'none' }} />
+        <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 8 }}>① Foto hochladen</p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(0,0,0,0.15)', border: `1px solid ${D.border}`, borderRadius: 10, padding: 12, cursor: 'pointer', marginBottom: 20 }}>
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} style={{ display: 'none' }} />
           {prevSrc
-            ? <img src={prevSrc} alt="" style={{ width:72, height:72, objectFit:'cover', borderRadius:8, flexShrink:0 }} />
-            : <div style={{ width:72, height:72, background:'rgba(255,255,255,0.1)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>📷</div>
+            ? <img src={prevSrc} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
+            : <div style={{ width: 72, height: 72, background: 'rgba(255,255,255,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>📷</div>
           }
           <div>
-            <p style={{ margin:0, fontWeight:'bold', color:D.text, fontSize:14 }}>{prevSrc ? t.change : t.upload}</p>
-            <p style={{ margin:'4px 0 0', fontSize:12, color:D.textDim }}>{t.uploadHint}</p>
+            <p style={{ margin: 0, fontWeight: 'bold', color: D.text, fontSize: 14 }}>{prevSrc ? t.change : t.upload}</p>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: D.textDim }}>{t.uploadHint}</p>
           </div>
         </label>
 
         {/* Step 2 — Generate */}
-        <p style={{ fontSize:11, letterSpacing:2, color:D.textDim, textTransform:'uppercase', marginBottom:8 }}>② {lang==='de'?'Vorschau erstellen':'Create preview'}</p>
+        <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 8 }}>② Vorschau erstellen</p>
         <button onClick={generate} disabled={!prevBlob || loading || count >= MAX}
-          style={{ ...sBtn(prevBlob && count<MAX ? '#fff' : 'rgba(255,255,255,0.25)', '#1a1a1a'), cursor: prevBlob && count<MAX ? 'pointer' : 'not-allowed', marginBottom:0 }}>
+          style={{ width: '100%', padding: '15px 0', background: prevBlob && count < MAX ? '#fff' : 'rgba(255,255,255,0.25)', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 16, fontWeight: 'bold', cursor: prevBlob && count < MAX ? 'pointer' : 'not-allowed', marginBottom: 8, fontFamily: F }}>
           {t.generate}
         </button>
-        {count >= MAX && <p style={{ color:D.error, textAlign:'center', fontSize:13, marginTop:8 }}>{t.limitMsg(MAX)}</p>}
-        {error && <p style={{ color:D.error, textAlign:'center', fontSize:13, marginTop:8 }}>{error}</p>}
+        {count >= MAX && <p style={{ color: D.error, textAlign: 'center', fontSize: 13, marginBottom: 8 }}>{t.limitMsg(MAX)}</p>}
+        {error && <p style={{ color: D.error, textAlign: 'center', fontSize: 13, marginBottom: 8 }}>{error}</p>}
 
-        {/* Step 3 — Result */}
-        {result && (
-          <div style={{ marginTop:24 }}>
-            <p style={{ fontSize:11, letterSpacing:2, color:D.textDim, textTransform:'uppercase', marginBottom:8 }}>③ {lang==='de'?'Dein Portrait':'Your portrait'}</p>
-
-            <div style={{ border:`1px solid ${D.border}`, borderRadius:10, overflow:'hidden', marginBottom:16 }}>
-              <img src={result.previewUrl} alt="Portrait" style={{ width:'100%', display:'block' }} />
-              <div style={{ padding:'10px 14px', background:'rgba(0,0,0,0.2)' }}>
-                <p style={{ margin:0, fontSize:13, color:'#7fff7f', fontWeight:'bold' }}>{t.readyMsg}</p>
-                <p style={{ margin:'4px 0 0', fontSize:11, color:D.textDim }}>{result.createdAt}</p>
-              </div>
-            </div>
-
-            {/* Thông báo rõ ràng */}
-            <div style={{ background:'rgba(255,255,255,0.1)', borderRadius:8, padding:'12px 14px', marginBottom:16, textAlign:'center' }}>
-              <p style={{ margin:0, fontSize:14, color:D.text, lineHeight:1.6 }}>
-                {lang==='de'
-                  ? '👇 Scrolle nach unten und klicke auf "In den Warenkorb" — dein Portrait-Link wird automatisch mitgeschickt.'
-                  : '👇 Scroll down and click "Add to Cart" — your portrait link will be included automatically.'
-                }
-              </p>
-            </div>
-
-            <button onClick={reset} style={sBtn('transparent', D.text, `1px solid ${D.border}`)}>
-              {t.regenerate}
-            </button>
-
-            <div style={{ background:'rgba(0,0,0,0.15)', borderRadius:10, padding:'14px 16px', textAlign:'center', marginBottom:16 }}>
-              <p style={{ fontSize:13, color:D.textMuted, margin:'0 0 8px', lineHeight:1.5 }}>{t.upsell}</p>
-              <span onClick={() => window.top.location.href = SHOP_CONFIG.originalPortraitUrl}
-                style={{ fontSize:14, color:D.text, fontWeight:'bold', textDecoration:'underline', cursor:'pointer' }}>
-                {t.upsellLink}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {hist.length > 0 && (
-          <button onClick={() => setShowHist(true)} style={{ ...sBtn('transparent', D.textDim, `1px solid rgba(255,255,255,0.15)`), fontWeight:'normal', fontSize:14 }}>
-            {t.history(hist.length)}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+        {/* Step 3 — Result_
