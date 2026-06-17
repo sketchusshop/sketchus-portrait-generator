@@ -5,11 +5,7 @@ import { SHOP_CONFIG, DESIGN, TRANSLATIONS } from '../config';
 const C = DESIGN.colors;
 const R = DESIGN.borderRadius;
 
-const RATIOS = {
-  landscape: 297 / 210,
-  portrait: 210 / 297,
-};
-
+const RATIOS = { landscape: 297 / 210, portrait: 210 / 297 };
 const HISTORY_KEY = 'sketchus_portrait_history';
 const MAX_HISTORY = 5;
 
@@ -64,6 +60,25 @@ function blobToBase64(blob) {
   });
 }
 
+// Thêm vào giỏ hàng Shopify đúng cách qua /cart/add
+async function addToCart(aiStoredUrl, originalStoredUrl) {
+  const properties = { 'Portrait-Vorschau': aiStoredUrl };
+  if (originalStoredUrl) properties['Originalfoto'] = originalStoredUrl;
+  properties['Erstellt am'] = new Date().toLocaleString('de-DE');
+
+  const res = await fetch(`https://${SHOP_CONFIG.shopDomain}/cart/add.js`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: SHOP_CONFIG.variantId,
+      quantity: 1,
+      properties,
+    }),
+  });
+  if (!res.ok) throw new Error('Cart add failed');
+  return `https://${SHOP_CONFIG.shopDomain}/checkout`;
+}
+
 function LoadingOverlay({ bgImage, t }) {
   const [progress, setProgress] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
@@ -113,11 +128,11 @@ function LoadingOverlay({ bgImage, t }) {
   );
 }
 
-function HistoryPanel({ history, onSelect, onClose, t }) {
+function HistoryPanel({ history, onSelect, onClose, onBuy, t }) {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: C.pageBg, zIndex: 1500, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}` }}>
-        <span style={{ color: C.text, fontWeight: 'bold', fontSize: 16 }}>{t.historyTitle}</span>
+      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+        <span style={{ color: C.text, fontWeight: 'bold', fontSize: 16 }}>{t.historyTitle} ({history.length})</span>
         <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: C.textMuted, fontSize: 24, cursor: 'pointer' }}>✕</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
@@ -125,7 +140,9 @@ function HistoryPanel({ history, onSelect, onClose, t }) {
           <div key={i} style={{ marginBottom: 20, borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}` }}>
             <img src={item.imageUrl} alt={`Portrait ${i + 1}`} style={{ width: '100%', display: 'block' }} />
             <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.15)' }}>
-              <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 10px' }}>{item.createdAt}</p>
+              <p style={{ color: C.textDim, fontSize: 11, margin: '0 0 10px' }}>
+                #{history.length - i} · {item.createdAt}
+              </p>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => onSelect(item)}
@@ -134,7 +151,7 @@ function HistoryPanel({ history, onSelect, onClose, t }) {
                   {t.historySelect}
                 </button>
                 <button
-                  onClick={() => { window.top.location.href = item.checkoutUrl; }}
+                  onClick={() => onBuy(item)}
                   style={{ flex: 1, padding: '10px 0', background: 'transparent', color: C.text, border: `1px solid ${C.border}`, borderRadius: R.btn, fontSize: 14, cursor: 'pointer' }}
                 >
                   {t.buyBtn(SHOP_CONFIG.price)}
@@ -161,8 +178,9 @@ export default function Home() {
   const [croppedPreview, setCroppedPreview] = useState(null);
   const [croppedBlob, setCroppedBlob] = useState(null);
   const [result, setResult] = useState(null);
-  const [checkoutUrl, setCheckoutUrl] = useState(null);
+  const [currentItem, setCurrentItem] = useState(null); // lưu full item hiện tại
   const [loading, setLoading] = useState(false);
+  const [buyLoading, setBuyLoading] = useState(false);
   const [error, setError] = useState(null);
   const [count, setCount] = useState(0);
   const [history, setHistory] = useState([]);
@@ -171,10 +189,7 @@ export default function Home() {
   useEffect(() => {
     const h = loadHistory();
     setHistory(h);
-    if (h.length > 0) {
-      setResult(h[0].imageUrl);
-      setCheckoutUrl(h[0].checkoutUrl);
-    }
+    // KHÔNG tự load ảnh — để khách chủ động xem lịch sử
   }, []);
 
   function handleUpload(e) {
@@ -183,7 +198,7 @@ export default function Home() {
     setRawPreview(URL.createObjectURL(file));
     setShowCropModal(true);
     setCroppedPreview(null); setCroppedBlob(null);
-    setResult(null); setCheckoutUrl(null); setError(null);
+    setResult(null); setCurrentItem(null); setError(null);
     setCrop({ x: 0, y: 0 }); setZoom(1);
   }
 
@@ -202,14 +217,26 @@ export default function Home() {
   }
 
   function handleReset() {
-    setResult(null); setCheckoutUrl(null); setError(null);
+    setResult(null); setCurrentItem(null); setError(null);
     setCroppedPreview(null); setCroppedBlob(null); setRawPreview(null);
   }
 
   function handleSelectFromHistory(item) {
     setResult(item.imageUrl);
-    setCheckoutUrl(item.checkoutUrl);
+    setCurrentItem(item);
     setShowHistory(false);
+  }
+
+  async function handleBuy(item) {
+    setBuyLoading(true);
+    try {
+      const checkoutUrl = await addToCart(item.aiStoredUrl, item.originalStoredUrl);
+      window.top.location.href = checkoutUrl;
+    } catch (e) {
+      alert('Fehler beim Hinzufügen zum Warenkorb. Bitte erneut versuchen.');
+    } finally {
+      setBuyLoading(false);
+    }
   }
 
   async function handleGenerate() {
@@ -227,13 +254,14 @@ export default function Home() {
 
       const newItem = {
         imageUrl: data.imageUrl,
-        checkoutUrl: data.checkoutUrl,
-        createdAt: new Date().toLocaleString('de-DE'),
+        aiStoredUrl: data.aiStoredUrl,
+        originalStoredUrl: data.originalStoredUrl,
+        createdAt: data.createdAt,
       };
       saveToHistory(newItem);
       setHistory(loadHistory());
       setResult(data.imageUrl);
-      setCheckoutUrl(data.checkoutUrl);
+      setCurrentItem(newItem);
       setCount(c => c + 1);
     } catch (err) {
       setError(err.message);
@@ -262,7 +290,15 @@ export default function Home() {
   return (
     <div style={s.container}>
       {loading && <LoadingOverlay bgImage={croppedPreview} t={t} />}
-      {showHistory && <HistoryPanel history={history} onSelect={handleSelectFromHistory} onClose={() => setShowHistory(false)} t={t} />}
+      {showHistory && (
+        <HistoryPanel
+          history={history}
+          onSelect={handleSelectFromHistory}
+          onClose={() => setShowHistory(false)}
+          onBuy={handleBuy}
+          t={t}
+        />
+      )}
 
       <h1 style={s.title}>{t.title}</h1>
       <p style={s.subtitle}>{t.subtitle}</p>
@@ -313,15 +349,13 @@ export default function Home() {
           <p style={{ color: C.textMuted, fontSize: 13, marginBottom: 10, textAlign: 'center' }}>{t.resultLabel}</p>
           <img src={result} alt="Portrait" style={s.resultImg} />
 
-          {/* Nút mua — dùng window.top để thoát khỏi iframe */}
-          {checkoutUrl && (
-            <button
-              onClick={() => { window.top.location.href = checkoutUrl; }}
-              style={s.buyBtn}
-            >
-              {t.buyBtn(SHOP_CONFIG.price)}
-            </button>
-          )}
+          <button
+            onClick={() => currentItem && handleBuy(currentItem)}
+            disabled={buyLoading || !currentItem}
+            style={{ ...s.buyBtn, opacity: buyLoading ? 0.7 : 1 }}
+          >
+            {buyLoading ? '...' : t.buyBtn(SHOP_CONFIG.price)}
+          </button>
 
           <button onClick={handleReset} style={s.btnSecondary}>{t.regenerate}</button>
 
@@ -344,7 +378,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Crop Modal */}
       {showCropModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: C.pageBg, display: 'flex', flexDirection: 'column', zIndex: 1000 }}>
           <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -356,7 +389,6 @@ export default function Home() {
               {orientation === 'landscape' ? '↕ Hochformat' : '↔ Querformat'}
             </button>
           </div>
-
           <div style={{ position: 'relative', height: 'calc(100vh - 200px)', background: '#4a4a4a', margin: '0 16px', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
             <Cropper
               image={rawPreview} crop={crop} zoom={zoom}
@@ -364,7 +396,6 @@ export default function Home() {
               onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropComplete}
             />
           </div>
-
           <div style={{ padding: '14px 16px 40px', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <span style={{ fontSize: 13, color: C.textMuted, whiteSpace: 'nowrap' }}>{t.zoom}</span>
