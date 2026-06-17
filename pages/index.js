@@ -255,4 +255,80 @@ export default function App() {
         {count >= MAX && <p style={{ color: D.error, textAlign: 'center', fontSize: 13, marginBottom: 8 }}>{t.limitMsg(MAX)}</p>}
         {error && <p style={{ color: D.error, textAlign: 'center', fontSize: 13, marginBottom: 8 }}>{error}</p>}
 
-        {/* Step 3 — Result_
+               {/* Step 3 — Result */}
+        {result && (
+          <div style={{ marginTop: 24 }}>
+            <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 8 }}>③ Dein Portrait</p>
+
+            {/* Ảnh trong khung — ngang hoặc dọc */}
+            <div style={{ position: 'relative', marginBottom: 16 }}>
+              {/* Khung ảnh */}
+              <div style={{
+                border: '12px solid #2a2a2a',
+                borderRadius: 4,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 2px #555',
+                overflow: 'hidden',
+                background: '#fff',
+                lineHeight: 0,
+              }}>
+                <img src={result.previewUrl} alt="Portrait"
+                  style={{ width: '100%', display: 'block' }} />
+              </div>
+
+              {/* Nút tải góc trên phải */}
+              <button
+                onClick={() => downloadImg(result.storedUrl)}
+                style={{
+                  position: 'absolute', top: 16, right: 16,
+                  padding: '8px 12px', fontSize: 12, fontWeight: 'bold',
+                  background: 'rgba(0,0,0,0.7)', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  borderRadius: 6, cursor: 'pointer', backdropFilter: 'blur(4px)',
+                }}
+              >
+                {t.download}
+              </button>
+            </div>
+
+            <p style={{ fontSize: 11, color: D.textDim, textAlign: 'center', marginBottom: 16 }}>{result.createdAt}</p>
+
+            {/* Nút thêm vào giỏ hàng */}
+            {cartDone ? (
+              <div style={{ background: 'rgba(100,200,100,0.2)', border: '1px solid rgba(100,200,100,0.5)', borderRadius: 8, padding: '14px', textAlign: 'center', marginBottom: 10 }}>
+                <p style={{ margin: 0, color: '#7fff7f', fontWeight: 'bold', fontSize: 15 }}>{t.cartSuccess}</p>
+              </div>
+            ) : (
+              <button onClick={() => addToCart(result)} disabled={cartLoading}
+                style={{ width: '100%', padding: '15px 0', background: cartLoading ? 'rgba(255,255,255,0.5)' : '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 16, fontWeight: 'bold', cursor: cartLoading ? 'not-allowed' : 'pointer', marginBottom: 10, fontFamily: F }}>
+                {cartLoading ? t.addingToCart : t.addToCart}
+              </button>
+            )}
+
+            {/* Nút tạo lại */}
+            <button onClick={reset}
+              style={{ width: '100%', padding: '13px 0', background: 'transparent', color: D.text, border: `1px solid ${D.border}`, borderRadius: BR, fontSize: 15, cursor: 'pointer', marginBottom: 16, fontFamily: F }}>
+              {t.regenerate}
+            </button>
+
+            {/* Upsell */}
+            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
+              <p style={{ fontSize: 13, color: D.textMuted, margin: '0 0 8px', lineHeight: 1.5 }}>{t.upsell}</p>
+              <span onClick={() => window.top.location.href = SHOP_CONFIG.originalPortraitUrl}
+                style={{ fontSize: 14, color: D.text, fontWeight: 'bold', textDecoration: 'underline', cursor: 'pointer' }}>
+                {t.upsellLink}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Nút lịch sử */}
+        {hist.length > 0 && (
+          <button onClick={() => setShowHist(true)}
+            style={{ width: '100%', padding: '12px 0', background: 'transparent', color: D.textDim, border: `1px solid rgba(255,255,255,0.15)`, borderRadius: BR, fontSize: 14, cursor: 'pointer', fontFamily: F, marginTop: result ? 16 : 0 }}>
+            {t.history(hist.length)}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
