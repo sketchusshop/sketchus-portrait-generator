@@ -11,39 +11,64 @@ export default async function handler(req, res) {
     const { imageBase64 } = req.body;
     if (!imageBase64) return res.status(400).json({ error: 'Kein Bild empfangen' });
 
-    // Dùng gpt-image-1 generate với vision — gửi ảnh qua messages
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
-            },
-            {
-              type: 'text',
-              text: 'Describe this person in detail: face shape, hair, facial features, expression, age, clothing.',
-            },
-          ],
-        },
-      ],
-      max_tokens: 500,
+    const buffer = Buffer.from(imageBase64, 'base64');
+
+    // Tạo FormData thủ công với boundary
+    const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
+    
+    const header = Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="image"; filename="photo.png"\r\n` +
+      `Content-Type: image/png\r\n\r\n`
+    );
+    
+    const modelPart = Buffer.from(
+      `\r\n--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="model"\r\n\r\n` +
+      `gpt-image-1`
+    );
+
+    const promptPart = Buffer.from(
+      `\r\n--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="prompt"\r\n\r\n` +
+      `Convert this photo into a highly detailed pencil sketch portrait. Black and white, hand-drawn pencil drawing style, fine pencil strokes, hatching and cross-hatching shading, realistic facial features, pure pencil on white paper. No color.`
+    );
+
+    const nPart = Buffer.from(
+      `\r\n--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="n"\r\n\r\n` +
+      `1`
+    );
+
+    const sizePart = Buffer.from(
+      `\r\n--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="size"\r\n\r\n` +
+      `1024x1024`
+    );
+
+    const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+
+    const body = Buffer.concat([header, buffer, modelPart, promptPart, nPart, sizePart, footer]);
+
+    // Gọi thẳng OpenAI REST API — bypass SDK hoàn toàn
+    const response = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      body,
     });
 
-    const description = response.choices[0].message.content;
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error('OpenAI error:', JSON.stringify(data));
+      return res.status(500).json({ error: data.error?.message || 'OpenAI Fehler' });
+    }
 
-    // Dùng mô tả để tạo ảnh bút chì
-    const imageResponse = await openai.images.generate({
-      model: 'gpt-image-1',
-      prompt: `A highly detailed pencil sketch portrait of: ${description}. Black and white, hand-drawn pencil drawing style, fine pencil strokes, hatching and cross-hatching shading, pure pencil on white paper. No color, no watercolor, only pencil.`,
-      n: 1,
-      size: '1024x1024',
-    });
-
-    const imageUrl = imageResponse.data[0].url
-      || `data:image/png;base64,${imageResponse.data[0].b64_json}`;
+    const imageUrl = data.data[0].url
+      || `data:image/png;base64,${data.data[0].b64_json}`;
 
     res.status(200).json({ imageUrl });
   } catch (e) {
