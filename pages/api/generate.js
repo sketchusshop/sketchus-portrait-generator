@@ -1,10 +1,22 @@
 import OpenAI from 'openai';
 import formidable from 'formidable';
 import fs from 'fs';
+import path from 'path';
 
 export const config = { api: { bodyParser: false } };
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+function getMimeType(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  const map = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+  };
+  return map[ext] || 'image/jpeg';
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -15,14 +27,11 @@ export default async function handler(req, res) {
 
     try {
       const file = files.image[0];
-      
-      // Đọc file và tạo Blob với đúng MIME type
-      const fileBuffer = fs.readFileSync(file.filepath);
-      const mimeType = file.mimetype || 'image/jpeg';
       const fileName = file.originalFilename || 'photo.jpg';
-      
-      const imageBlob = new Blob([fileBuffer], { type: mimeType });
-      const imageFile = new File([imageBlob], fileName, { type: mimeType });
+      const mimeType = getMimeType(fileName);
+
+      const fileBuffer = fs.readFileSync(file.filepath);
+      const imageFile = new File([fileBuffer], fileName, { type: mimeType });
 
       const response = await openai.images.edit({
         model: 'gpt-image-1',
@@ -35,7 +44,7 @@ pure pencil on white paper. No color.`,
         size: '1024x1024',
       });
 
-      const imageUrl = response.data[0].url 
+      const imageUrl = response.data[0].url
         || `data:image/png;base64,${response.data[0].b64_json}`;
       res.status(200).json({ imageUrl });
     } catch (e) {
