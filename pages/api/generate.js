@@ -1,6 +1,12 @@
 import { AI_PROMPT } from '../../config';
 
-export const config = { api: { bodyParser: { sizeLimit: '20mb' } } };
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '20mb',
+    },
+  },
+};
 
 async function imgbb(b64) {
   const f = new URLSearchParams();
@@ -8,29 +14,53 @@ async function imgbb(b64) {
   f.append('image', b64);
   f.append('expiration', '15552000');
 
-  const r = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: f });
+  const r = await fetch('https://api.imgbb.com/1/upload', {
+    method: 'POST',
+    body: f,
+  });
+
   const j = await r.json();
 
-  if (!j.success) throw new Error('ImgBB: ' + JSON.stringify(j.error));
+  if (!j.success) {
+    throw new Error('ImgBB: ' + JSON.stringify(j.error));
+  }
+
   return j.data.url;
 }
 
+function addFormField(parts, boundary, name, value) {
+  parts.push(
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
+    )
+  );
+}
+
 function buildImageEditBody({ imageBuffer, model, prompt }) {
-  const b = 'boundary' + Date.now();
+  const boundary = 'boundary' + Date.now();
+  const parts = [];
 
-  const body = Buffer.concat([
-    Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="model"\r\n\r\n${model}\r\n`),
-    Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="prompt"\r\n\r\n${prompt}\r\n`),
-    Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="n"\r\n\r\n1\r\n`),
-    Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="size"\r\n\r\n1536x1024\r\n`),
-    Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="quality"\r\n\r\nhigh\r\n`),
-    Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="input_fidelity"\r\n\r\nhigh\r\n`),
-    Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="image"; filename="photo.png"\r\nContent-Type: image/png\r\n\r\n`),
-    imageBuffer,
-    Buffer.from(`\r\n--${b}--\r\n`),
-  ]);
+  addFormField(parts, boundary, 'model', model);
+  addFormField(parts, boundary, 'prompt', prompt);
+  addFormField(parts, boundary, 'n', '1');
+  addFormField(parts, boundary, 'size', '1536x1024');
 
-  return { body, boundary: b };
+  // Giữ quality, nhưng bỏ input_fidelity vì gpt-image-2 không hỗ trợ
+  addFormField(parts, boundary, 'quality', 'high');
+
+  parts.push(
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="photo.png"\r\nContent-Type: image/png\r\n\r\n`
+    )
+  );
+
+  parts.push(imageBuffer);
+  parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+  return {
+    body: Buffer.concat(parts),
+    boundary,
+  };
 }
 
 async function createImageEdit({ imageBuffer, model }) {
@@ -60,10 +90,15 @@ async function createImageEdit({ imageBuffer, model }) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   const { imageBase64 } = req.body || {};
-  if (!imageBase64) return res.status(400).json({ error: 'No image' });
+
+  if (!imageBase64) {
+    return res.status(400).json({ error: 'No image' });
+  }
 
   try {
     const imageBuffer = Buffer.from(imageBase64, 'base64');
@@ -80,6 +115,7 @@ export default async function handler(req, res) {
       console.warn('gpt-image-2 failed, fallback to gpt-image-1:', err.message);
 
       usedModel = 'gpt-image-1';
+
       aiData = await createImageEdit({
         imageBuffer,
         model: 'gpt-image-1',
@@ -98,15 +134,17 @@ export default async function handler(req, res) {
     }
 
     const storedUrl = await imgbb(aiB64);
-    const previewUrl = aiData.data?.[0]?.url || `data:image/png;base64,${aiB64}`;
 
     return res.status(200).json({
-      previewUrl,
+      previewUrl: storedUrl,
       storedUrl,
       model: usedModel,
     });
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: e.message });
+
+    return res.status(500).json({
+      error: e.message || 'Server error',
+    });
   }
 }
