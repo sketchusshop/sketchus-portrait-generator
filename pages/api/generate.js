@@ -15,11 +15,8 @@ async function imgbb(b64) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const { imageBase64, orientation } = req.body || {};
+  const { imageBase64 } = req.body || {};
   if (!imageBase64) return res.status(400).json({ error: 'No image' });
-
-  // Dọc = 1024x1536, Ngang = 1536x1024
-  const size = orientation === 'portrait' ? '1024x1536' : '1536x1024';
 
   try {
     const buf = Buffer.from(imageBase64, 'base64');
@@ -28,7 +25,7 @@ export default async function handler(req, res) {
       Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="model"\r\n\r\ngpt-image-1\r\n`),
       Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="prompt"\r\n\r\n${AI_PROMPT}\r\n`),
       Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="n"\r\n\r\n1\r\n`),
-      Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="size"\r\n\r\n${size}\r\n`),
+      Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="size"\r\n\r\n1536x1024\r\n`),
       Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="image"; filename="photo.png"\r\nContent-Type: image/png\r\n\r\n`),
       buf,
       Buffer.from(`\r\n--${b}--\r\n`),
