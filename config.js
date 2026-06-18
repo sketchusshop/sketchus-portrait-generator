@@ -1,7 +1,7 @@
 export const SHOP_CONFIG = {
   shopDomain: 'sketch-us.myshopify.com',
   variantId: '58043598831880',
-  price: '€9,99',
+  price: '9,99',
   originalPortraitUrl: 'https://sketchus.de/products/portrait-zeichnen-lassen',
   maxPreviews: 10,
   estimatedMs: 55000,
@@ -18,7 +18,19 @@ export const DESIGN = {
   btn: 4,
 };
 
-export const AI_PROMPT = `Create a handmade graphite and charcoal portrait from the uploaded photo. Preserve the exact face identity, face shape, head angle, gaze, expression, age, hairstyle, and distinctive features. Do not change or beautify any face. Make the portrait look clearly hand-drawn, not photo-like: visible pencil strokes, rough charcoal texture, grainy shading, strong dark blacks, bright paper highlights, bold contrast, expressive hand shading. Focus detail on the face, eyes, nose, mouth, and important identity features. Simplify clothing, hair masses, background, and small details with loose sketch lines and soft unfinished edges. Remove the original background. Add a light paper background with rough charcoal shadows and airy empty space. Style: traditional charcoal and graphite drawing on textured white paper, dramatic light and shadow, natural hand pressure, sketchy edges, not smooth, not polished, not digital filter, not photorealistic. No text, logo, watermark, or signature.;
+export const AI_PROMPT = `Create a handmade graphite and charcoal portrait from the uploaded photo.
+
+Preserve the exact face identity, face shape, head angle, gaze, expression, age, hairstyle, and distinctive features. Do not change or beautify any face.
+
+Make the portrait look clearly hand-drawn, not photo-like: visible pencil strokes, rough charcoal texture, grainy shading, strong dark blacks, bright paper highlights, bold contrast, expressive hand shading.
+
+Focus detail on the face, eyes, nose, mouth, and important identity features. Simplify clothing, hair masses, background, and small details with loose sketch lines and soft unfinished edges.
+
+Remove the original background. Add a light paper background with rough charcoal shadows and airy empty space.
+
+Style: traditional charcoal and graphite drawing on textured white paper, dramatic light and shadow, natural hand pressure, sketchy edges, not smooth, not polished, not digital filter, not photorealistic.
+
+No text, logo, watermark, or signature.`;
 
 export const LANG = {
   de: {
@@ -28,17 +40,22 @@ export const LANG = {
     upload: 'Foto hochladen',
     uploadHint: 'JPG, PNG oder WEBP',
     change: 'Anderes Foto',
-    cropTitle: 'Ausschnitt wählen',
-    cropSave: 'Übernehmen',
+    cropTitle: 'Ausschnitt waehlen',
+    cropSave: 'Uebernehmen',
     cropCancel: 'Abbrechen',
     generate: 'Skizze ansehen',
-    loadingSteps: ['Foto wird vorbereitet', 'Skizze wird erstellt', 'Details werden verfeinert', 'Fast fertig'],
-    loadingNote: 'Nur 1 Foto möglich. Für mehrere Vorlagen oder ein handgezeichnetes Original bitte Sketchus Originalportrait wählen.',
+    loadingSteps: [
+      'Foto wird vorbereitet',
+      'Skizze wird erstellt',
+      'Details werden verfeinert',
+      'Fast fertig',
+    ],
+    loadingNote: 'Nur 1 Foto moeglich. Fuer mehrere Vorlagen oder ein handgezeichnetes Original bitte Sketchus Originalportrait waehlen.',
     limitMsg: () => 'Limit erreicht.',
     errGeneric: 'Fehler. Bitte erneut versuchen.',
-    history: (n) => ` Frühere Skizzen (${n})`,
+    history: (n) => `Fruehere Skizzen (${n})`,
     historyTitle: 'Deine Skizzen',
-    historySelect: 'Auswählen',
+    historySelect: 'Auswaehlen',
   },
   en: {
     title: '',
@@ -51,11 +68,16 @@ export const LANG = {
     cropSave: 'Apply',
     cropCancel: 'Cancel',
     generate: 'See sketch',
-    loadingSteps: ['Preparing photo', 'Creating sketch', 'Refining details', 'Almost done'],
+    loadingSteps: [
+      'Preparing photo',
+      'Creating sketch',
+      'Refining details',
+      'Almost done',
+    ],
     loadingNote: 'Only 1 photo possible. For multiple versions or a hand-drawn original, please choose Sketchus Original Portrait.',
     limitMsg: () => 'Limit reached.',
     errGeneric: 'Error. Please try again.',
-    history: (n) => ` Previous sketches (${n})`,
+    history: (n) => `Previous sketches (${n})`,
     historyTitle: 'Your sketches',
     historySelect: 'Select',
   },
