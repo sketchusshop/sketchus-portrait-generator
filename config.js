@@ -18,11 +18,17 @@ export const DESIGN = {
 };
 
 export const AI_PROMPT = `
-Preserve the uploaded photo subject 100% exactly. No redraw, no new portrait, no face change, no identity change.
+Do not redraw. Do not regenerate. Do not create a new image.
 
-Only increase black-white contrast and apply graphite pencil texture. Change only the background to soft charcoal paper shading.
+Keep the uploaded subject exactly the same: no face change, no identity change, no pose change, no proportion change, no added or removed details.
 
-Everything else must stay the same. No beautifying, no added details, no text.
+Preserve the original face and main subject 100%: same eyes, nose, mouth, jawline, expression, gaze, angle, hair, glasses, body shape, animal shape, vehicle shape, or object shape.
+
+Only apply a strong high-contrast black-and-white graphite pencil filter to the original subject: deeper blacks, brighter whites, sharper shadows, visible pencil grain.
+
+Remove the original background. The original background must not remain visible. Replace it with soft charcoal shading on textured white paper.
+
+Simplify secondary details into loose charcoal texture only. No beautifying, no smoothing, no new details, no text, no logo, no watermark.
 `;
 
 export const LANG = {
