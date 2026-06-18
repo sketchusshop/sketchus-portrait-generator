@@ -139,21 +139,19 @@ export default function App() {
 
   const MAX = SHOP_CONFIG.maxPreviews;
 
-  useEffect(() => {
-    setHist(getHist());
-    // Gửi height ban đầu
-    setTimeout(sendHeight, 300);
-  }, []);
+ useEffect(() => {
+  setHist(getHist());
+  setTimeout(sendHeight, 500);
+}, []);
 
-  // Gửi height mỗi khi UI thay đổi
-  useEffect(() => {
-    // Khi crop modal mở: iframe cần cao hơn để chứa modal
-    if (showCrop) {
-      window.parent.postMessage({ type: 'IFRAME_HEIGHT', height: 600 }, '*');
-    } else {
-      setTimeout(sendHeight, 100);
-    }
-  }, [result, loading, showCrop, showHist, prevSrc, error]);
+useEffect(() => {
+  if (showCrop) {
+    window.parent.postMessage({ type: 'IFRAME_HEIGHT', height: 580 }, '*');
+  } else {
+    setTimeout(sendHeight, 150);
+  }
+}, [result, loading, showCrop, showHist, prevSrc, error, count]);
+
 
   function handleFile(e) {
     const f = e.target.files?.[0]; if (!f) return;
