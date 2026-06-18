@@ -3,9 +3,9 @@ import Cropper from 'react-easy-crop';
 import { SHOP_CONFIG, DESIGN, LANG } from '../config';
 
 const D = DESIGN;
-const HIST_KEY = 'sk_hist_v10';
+const HIST_KEY = 'sk_hist_v11';
 const RATIO = 297 / 210;
-const BG = '#636363'; // màu Sketchus
+const BG = '#636363';
 
 function getLang() {
   if (typeof window === 'undefined') return 'de';
@@ -29,6 +29,13 @@ function savePortraitUrl(url) {
   try {
     localStorage.setItem('sk_portrait_url', url);
     window.parent.postMessage({ type: 'PORTRAIT_URL', url }, '*');
+  } catch {}
+}
+
+function sendHeight() {
+  try {
+    const h = document.documentElement.scrollHeight || document.body.scrollHeight;
+    window.parent.postMessage({ type: 'IFRAME_HEIGHT', height: h }, '*');
   } catch {}
 }
 
@@ -81,12 +88,9 @@ function LoadingCard({ t, bg }) {
 
   return (
     <div style={{
-      background: BG,
-      borderRadius: 14, padding: '18px 16px',
-      width: '100%', maxWidth: 280,
-      textAlign: 'center', color: '#fff',
-      fontFamily: D.font,
-      boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+      background: BG, borderRadius: 14, padding: '18px 16px',
+      width: '100%', maxWidth: 280, textAlign: 'center', color: '#fff',
+      fontFamily: D.font, boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
       border: '1px solid rgba(255,255,255,0.2)',
     }}>
       {bg && (
@@ -94,7 +98,7 @@ function LoadingCard({ t, bg }) {
           <img src={bg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
       )}
-      <p style={{ fontSize: 9, letterSpacing: 3, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: 6, margin: '0 0 6px' }}>WIRD ERSTELLT</p>
+      <p style={{ fontSize: 9, letterSpacing: 3, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', margin: '0 0 6px' }}>WIRD ERSTELLT</p>
       <p style={{ fontSize: 13, fontWeight: 'bold', margin: '0 0 12px' }}>{t.loadingSteps[step]}…</p>
       <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 12, overflow: 'hidden' }}>
         <div style={{ height: '100%', background: '#fff', width: `${pct}%`, transition: 'width 0.25s', borderRadius: 99 }} />
@@ -132,17 +136,21 @@ export default function App() {
 
   const MAX = SHOP_CONFIG.maxPreviews;
 
-  useEffect(() => { setHist(getHist()); }, []);
-// Thêm function này vào App()
-function sendHeight() {
-  const h = document.body.scrollHeight;
-  window.parent.postMessage({ type: 'IFRAME_HEIGHT', height: h }, '*');
-}
+  useEffect(() => {
+    setHist(getHist());
+    // Gửi height ban đầu
+    setTimeout(sendHeight, 300);
+  }, []);
 
-// Thêm useEffect này
-useEffect(() => {
-  sendHeight();
-}, [result, loading, showCrop, showHist, prevSrc]);
+  // Gửi height mỗi khi UI thay đổi
+  useEffect(() => {
+    // Khi crop modal mở: iframe cần cao hơn để chứa modal
+    if (showCrop) {
+      window.parent.postMessage({ type: 'IFRAME_HEIGHT', height: 600 }, '*');
+    } else {
+      setTimeout(sendHeight, 100);
+    }
+  }, [result, loading, showCrop, showHist, prevSrc, error]);
 
   function handleFile(e) {
     const f = e.target.files?.[0]; if (!f) return;
@@ -183,40 +191,42 @@ useEffect(() => {
   return (
     <div style={{ background: BG, fontFamily: F, color: D.text, boxSizing: 'border-box' }}>
 
-      {/* Loading — ô nhỏ, nền cùng màu Sketchus */}
+      {/* Loading */}
       {loading && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(99,99,99,0.75)', // #636363 mờ
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 20,
+          background: 'rgba(99,99,99,0.8)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
         }}>
           <LoadingCard t={t} bg={prevSrc} />
         </div>
       )}
 
-      {/* Crop Modal — nền cùng màu Sketchus */}
+      {/* Crop Modal — fixed, không phụ thuộc iframe height */}
       {showCrop && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1000,
-          background: BG, // cùng màu #636363, không đen
+          background: BG,
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
-          padding: '0 12px',
+          padding: '16px 12px',
           boxSizing: 'border-box',
         }}>
-          <div style={{
-            width: '100%', maxWidth: 400,
-            display: 'flex', flexDirection: 'column',
-            gap: 0,
-          }}>
-            {/* Title nhỏ */}
-            <p style={{ margin: '0 0 8px', fontWeight: '600', fontSize: 13, color: '#fff', textAlign: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 400 }}>
+            {/* Title */}
+            <p style={{ margin: '0 0 10px', fontWeight: '600', fontSize: 13, color: '#fff', textAlign: 'center' }}>
               {t.cropTitle}
             </p>
 
-            {/* Crop area */}
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', background: '#4a4a4a', borderRadius: 8, overflow: 'hidden' }}>
+            {/* Crop area — chiều cao cố định tránh tràn */}
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              height: 260,
+              background: '#4a4a4a',
+              borderRadius: 8,
+              overflow: 'hidden',
+            }}>
               <Cropper
                 image={rawSrc} crop={crop} zoom={zoom} aspect={RATIO}
                 onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropDone}
@@ -224,21 +234,21 @@ useEffect(() => {
               />
             </div>
 
-            {/* Nút nhỏ bên dưới */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            {/* Nút Abbrechen + Übernehmen — luôn hiện */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button onClick={cancelCrop} style={{
-                flex: 1, padding: '11px 0',
-                background: 'rgba(255,255,255,0.15)', color: '#ddd',
-                border: '1px solid rgba(255,255,255,0.25)',
-                borderRadius: 6, fontSize: 13, cursor: 'pointer', fontFamily: F,
+                flex: 1, padding: '13px 0',
+                background: 'rgba(255,255,255,0.15)', color: '#eee',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 6, fontSize: 14, cursor: 'pointer', fontFamily: F,
               }}>
                 {t.cropCancel}
               </button>
               <button onClick={saveCrop} style={{
-                flex: 1, padding: '11px 0',
+                flex: 1, padding: '13px 0',
                 background: '#fff', color: '#1a1a1a',
-                border: 'none',
-                borderRadius: 6, fontSize: 13, fontWeight: 'bold', cursor: 'pointer', fontFamily: F,
+                border: 'none', borderRadius: 6,
+                fontSize: 14, fontWeight: 'bold', cursor: 'pointer', fontFamily: F,
               }}>
                 {t.cropSave}
               </button>
@@ -271,21 +281,16 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ── Main — compact, không khoảng trống ── */}
+      {/* Main */}
       <div style={{ padding: '10px 12px 20px', maxWidth: 480, margin: '0 auto' }}>
 
-        {/* Header */}
         <h1 style={{ fontSize: 16, fontWeight: 'bold', textAlign: 'center', margin: '0 0 2px' }}>{t.title}</h1>
         <p style={{ fontSize: 11, color: D.textMuted, textAlign: 'center', margin: '0 0 2px', lineHeight: 1.4 }}>{t.sub}</p>
         <p style={{ fontSize: 10, color: D.textDim, textAlign: 'center', margin: '0 0 12px' }}>{t.counter(count, MAX)}</p>
 
-        {/* Step 1 — Upload */}
+        {/* Step 1 */}
         <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 5px' }}>① Foto hochladen</p>
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          background: 'rgba(0,0,0,0.15)', border: `1px solid ${D.border}`,
-          borderRadius: 8, padding: '8px 10px', cursor: 'pointer', marginBottom: 12,
-        }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(0,0,0,0.15)', border: `1px solid ${D.border}`, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', marginBottom: 12 }}>
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} style={{ display: 'none' }} />
           {prevSrc
             ? <img src={prevSrc} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
@@ -297,17 +302,10 @@ useEffect(() => {
           </div>
         </label>
 
-        {/* Step 2 — Generate */}
+        {/* Step 2 */}
         <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 5px' }}>② Vorschau erstellen</p>
         <button onClick={generate} disabled={!prevBlob || loading || count >= MAX}
-          style={{
-            width: '100%', padding: '12px 0',
-            background: prevBlob && count < MAX ? '#fff' : 'rgba(255,255,255,0.25)',
-            color: '#1a1a1a', border: 'none', borderRadius: BR,
-            fontSize: 15, fontWeight: 'bold',
-            cursor: prevBlob && count < MAX ? 'pointer' : 'not-allowed',
-            marginBottom: 4, fontFamily: F,
-          }}>
+          style={{ width: '100%', padding: '12px 0', background: prevBlob && count < MAX ? '#fff' : 'rgba(255,255,255,0.25)', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 15, fontWeight: 'bold', cursor: prevBlob && count < MAX ? 'pointer' : 'not-allowed', marginBottom: 4, fontFamily: F }}>
           {t.generate}
         </button>
         {count >= MAX && <p style={{ color: D.error, textAlign: 'center', fontSize: 11, margin: '4px 0' }}>{t.limitMsg(MAX)}</p>}
@@ -331,19 +329,12 @@ useEffect(() => {
             <button
               onClick={async () => { setDownloading(true); await downloadDirect(result.storedUrl); setDownloading(false); }}
               disabled={downloading}
-              style={{
-                width: '100%', padding: '12px 0',
-                background: 'rgba(255,255,255,0.12)', color: D.text,
-                border: `1px solid ${D.border}`,
-                borderRadius: BR, fontSize: 13, fontWeight: 'bold',
-                cursor: 'pointer', marginBottom: 10, fontFamily: F,
-              }}
-            >
+              style={{ width: '100%', padding: '12px 0', background: 'rgba(255,255,255,0.12)', color: D.text, border: `1px solid ${D.border}`, borderRadius: BR, fontSize: 13, fontWeight: 'bold', cursor: 'pointer', marginBottom: 10, fontFamily: F }}>
               {downloading ? '…' : '⬇ ' + (lang === 'de' ? 'Portrait auf Gerät speichern' : 'Save portrait to device')}
             </button>
 
-            {/* Thông điệp mua hàng */}
-            <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', textAlign: 'center', marginBottom: 12, border: `1px solid rgba(255,255,255,0.12)` }}>
+            {/* Thông điệp mua */}
+            <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', textAlign: 'center', border: `1px solid rgba(255,255,255,0.12)` }}>
               <p style={{ margin: 0, fontSize: 12, color: D.text, lineHeight: 1.6 }}>
                 {lang === 'de'
                   ? '🎨 Zufrieden mit dieser Skizze? Klicke auf den Warenkorb — du erhältst dein Poster in wenigen Tagen.'
@@ -351,8 +342,6 @@ useEffect(() => {
                 }
               </p>
             </div>
-
-            
           </div>
         )}
 
