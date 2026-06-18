@@ -34,7 +34,7 @@ function savePortraitUrl(url) {
 
 function sendHeight() {
   try {
-    var h = Math.max(
+    const h = Math.max(
       document.body.scrollHeight,
       document.body.offsetHeight,
       document.documentElement.scrollHeight
@@ -67,21 +67,32 @@ function toB64(blob) {
 function LoadingCard({ t, bg }) {
   const [pct, setPct] = useState(0);
   const [step, setStep] = useState(0);
+
   useEffect(() => {
-    const tick = 250, inc = (tick / SHOP_CONFIG.estimatedMs) * 100;
-    const id = setInterval(() => setPct(p => {
-      const n = Math.min(p + inc, 95);
-      setStep(n < 25 ? 0 : n < 55 ? 1 : n < 80 ? 2 : 3);
-      return n;
-    }), tick);
+    const ms = SHOP_CONFIG.estimatedMs;
+    const tick = 250;
+    const inc = (tick / ms) * 100;
+    const id = setInterval(() => {
+      setPct(p => {
+        const n = Math.min(p + inc, 95);
+        setStep(n < 25 ? 0 : n < 55 ? 1 : n < 80 ? 2 : 3);
+        return n;
+      });
+    }, tick);
     return () => clearInterval(id);
   }, []);
 
   return (
     <div style={{
-      background: BG, borderRadius: 14, padding: '18px 16px',
-      width: '100%', maxWidth: 300, textAlign: 'center', color: '#fff',
-      fontFamily: D.font, boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+      background: BG,
+      borderRadius: 14,
+      padding: '18px 16px',
+      width: '100%',
+      maxWidth: 300,
+      textAlign: 'center',
+      color: '#fff',
+      fontFamily: D.font,
+      boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
       border: '1px solid rgba(255,255,255,0.2)',
     }}>
       {bg && (
@@ -89,8 +100,12 @@ function LoadingCard({ t, bg }) {
           <img src={bg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
       )}
-      <p style={{ fontSize: 9, letterSpacing: 3, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', margin: '0 0 6px' }}>WIRD ERSTELLT</p>
-      <p style={{ fontSize: 13, fontWeight: 'bold', margin: '0 0 12px' }}>{t.loadingSteps[step]}…</p>
+      <p style={{ fontSize: 9, letterSpacing: 3, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', margin: '0 0 6px' }}>
+        WIRD ERSTELLT
+      </p>
+      <p style={{ fontSize: 13, fontWeight: 'bold', margin: '0 0 12px' }}>
+        {t.loadingSteps[step]}…
+      </p>
       <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 12, overflow: 'hidden' }}>
         <div style={{ height: '100%', background: '#fff', width: `${pct}%`, transition: 'width 0.25s', borderRadius: 99 }} />
       </div>
@@ -99,10 +114,11 @@ function LoadingCard({ t, bg }) {
           <span style={{ width: 13, textAlign: 'center', fontSize: 10, color: i <= step ? '#fff' : 'rgba(255,255,255,0.2)', flexShrink: 0 }}>
             {i < step ? '✓' : i === step ? '●' : '○'}
           </span>
-          <span style={{ fontSize: 11, color: i === step ? '#fff' : i < step ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.2)', fontWeight: i === step ? 'bold' : 'normal' }}>{s}</span>
+          <span style={{ fontSize: 11, color: i === step ? '#fff' : i < step ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.2)', fontWeight: i === step ? 'bold' : 'normal' }}>
+            {s}
+          </span>
         </div>
       ))}
-      {/* Thông điệp quan trọng */}
       <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.15)' }}>
         <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, margin: 0 }}>
           {t.loadingNote}
@@ -115,6 +131,7 @@ function LoadingCard({ t, bg }) {
 export default function App() {
   const lang = useRef(getLang()).current;
   const t = LANG[lang];
+  const MAX = SHOP_CONFIG.maxPreviews;
 
   const [rawSrc, setRawSrc] = useState(null);
   const [showCrop, setShowCrop] = useState(false);
@@ -130,8 +147,6 @@ export default function App() {
   const [hist, setHist] = useState([]);
   const [showHist, setShowHist] = useState(false);
 
-  const MAX = SHOP_CONFIG.maxPreviews;
-
   useEffect(() => {
     setHist(getHist());
     setTimeout(sendHeight, 500);
@@ -146,20 +161,28 @@ export default function App() {
   }, [result, loading, showCrop, showHist, prevSrc, error, count]);
 
   function handleFile(e) {
-    const f = e.target.files?.[0]; if (!f) return;
+    const f = e.target.files?.[0];
+    if (!f) return;
     setRawSrc(URL.createObjectURL(f));
-    setPrevSrc(null); setPrevBlob(null); setResult(null); setError(null);
-    setCrop({ x: 0, y: 0 }); setZoom(1); setShowCrop(true);
+    setPrevSrc(null); setPrevBlob(null);
+    setResult(null); setError(null);
+    setCrop({ x: 0, y: 0 }); setZoom(1);
+    setShowCrop(true);
   }
 
   const onCropDone = useCallback((_, px) => setCropPx(px), []);
 
   async function saveCrop() {
     const blob = await cropImg(rawSrc, cropPx);
-    setPrevBlob(blob); setPrevSrc(URL.createObjectURL(blob)); setShowCrop(false);
+    setPrevBlob(blob);
+    setPrevSrc(URL.createObjectURL(blob));
+    setShowCrop(false);
   }
 
-  function cancelCrop() { setShowCrop(false); if (!prevSrc) setRawSrc(null); }
+  function cancelCrop() {
+    setShowCrop(false);
+    if (!prevSrc) setRawSrc(null);
+  }
 
   async function generate() {
     if (!prevBlob || count >= MAX) return;
@@ -167,29 +190,42 @@ export default function App() {
     try {
       const b64 = await toB64(prevBlob);
       const res = await fetch('/api/generate', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: b64 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t.errGeneric);
-      const item = { previewUrl: data.previewUrl, storedUrl: data.storedUrl, createdAt: new Date().toLocaleString('de-DE') };
-      addHist(item); setHist(getHist()); setResult(item); setCount(c => c + 1);
+      const item = {
+        previewUrl: data.previewUrl,
+        storedUrl: data.storedUrl,
+        createdAt: new Date().toLocaleString('de-DE'),
+      };
+      addHist(item);
+      setHist(getHist());
+      setResult(item);
+      setCount(c => c + 1);
       savePortraitUrl(data.storedUrl);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const BR = D.btn; const F = D.font;
+  const BR = D.btn;
+  const F = D.font;
 
   return (
     <div style={{ background: BG, fontFamily: F, color: D.text, boxSizing: 'border-box' }}>
 
-      {/* Loading */}
+      {/* Loading overlay */}
       {loading && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(99,99,99,0.8)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          background: 'rgba(99,99,99,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 20,
         }}>
           <LoadingCard t={t} bg={prevSrc} />
         </div>
@@ -202,13 +238,17 @@ export default function App() {
           background: BG,
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
-          padding: '16px 12px', boxSizing: 'border-box',
+          padding: '16px 12px',
+          boxSizing: 'border-box',
         }}>
           <div style={{ width: '100%', maxWidth: 400 }}>
             <p style={{ margin: '0 0 10px', fontWeight: '600', fontSize: 13, color: '#fff', textAlign: 'center' }}>
               {t.cropTitle}
             </p>
-            <div style={{ position: 'relative', width: '100%', height: 260, background: '#4a4a4a', borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{
+              position: 'relative', width: '100%', height: 260,
+              background: '#4a4a4a', borderRadius: 8, overflow: 'hidden',
+            }}>
               <Cropper
                 image={rawSrc} crop={crop} zoom={zoom} aspect={RATIO}
                 onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropDone}
@@ -216,10 +256,20 @@ export default function App() {
               />
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button onClick={cancelCrop} style={{ flex: 1, padding: '13px 0', background: 'rgba(255,255,255,0.15)', color: '#eee', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, fontSize: 14, cursor: 'pointer', fontFamily: F }}>
+              <button onClick={cancelCrop} style={{
+                flex: 1, padding: '13px 0',
+                background: 'rgba(255,255,255,0.15)', color: '#eee',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 6, fontSize: 14, cursor: 'pointer', fontFamily: F,
+              }}>
                 {t.cropCancel}
               </button>
-              <button onClick={saveCrop} style={{ flex: 1, padding: '13px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 'bold', cursor: 'pointer', fontFamily: F }}>
+              <button onClick={saveCrop} style={{
+                flex: 1, padding: '13px 0',
+                background: '#fff', color: '#1a1a1a',
+                border: 'none', borderRadius: 6,
+                fontSize: 14, fontWeight: 'bold', cursor: 'pointer', fontFamily: F,
+              }}>
                 {t.cropSave}
               </button>
             </div>
@@ -240,7 +290,8 @@ export default function App() {
                 <img src={item.previewUrl} alt="" style={{ width: '100%', display: 'block' }} />
                 <div style={{ padding: '8px 10px', background: 'rgba(0,0,0,0.15)' }}>
                   <p style={{ color: D.textDim, fontSize: 10, margin: '0 0 8px' }}>#{hist.length - i} · {item.createdAt}</p>
-                  <button onClick={() => { setResult(item); savePortraitUrl(item.storedUrl); setShowHist(false); }}
+                  <button
+                    onClick={() => { setResult(item); savePortraitUrl(item.storedUrl); setShowHist(false); }}
                     style={{ width: '100%', padding: '10px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 13, fontWeight: 'bold', cursor: 'pointer' }}>
                     {t.historySelect}
                   </button>
@@ -254,12 +305,20 @@ export default function App() {
       {/* Main */}
       <div style={{ padding: '10px 12px 16px', maxWidth: 480, margin: '0 auto' }}>
 
-        {/* Sub title — to hơn, không có title chính */}
-        <p style={{ fontSize: 14, fontWeight: '600', color: D.text, textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>{t.sub}</p>
+        {/* Subtitle lớn hơn */}
+        <p style={{ fontSize: 14, fontWeight: '600', color: D.text, textAlign: 'center', margin: '0 0 12px', lineHeight: 1.4 }}>
+          {t.sub}
+        </p>
 
-        {/* Step 1 */}
-        <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 5px' }}>① Foto hochladen</p>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(0,0,0,0.15)', border: `1px solid ${D.border}`, borderRadius: 8, padding: '8px 10px', cursor: 'pointer', marginBottom: 12 }}>
+        {/* Step 1 — Upload */}
+        <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 5px' }}>
+          ① Foto hochladen
+        </p>
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'rgba(0,0,0,0.15)', border: `1px solid ${D.border}`,
+          borderRadius: 8, padding: '8px 10px', cursor: 'pointer', marginBottom: 12,
+        }}>
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} style={{ display: 'none' }} />
           {prevSrc
             ? <img src={prevSrc} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
@@ -271,19 +330,40 @@ export default function App() {
           </div>
         </label>
 
-        {/* Step 2 */}
-        <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 5px' }}>② Skizze erstellen</p>
-        <button onClick={generate} disabled={!prevBlob || loading || count >= MAX}
-          style={{ width: '100%', padding: '12px 0', background: prevBlob && count < MAX ? '#fff' : 'rgba(255,255,255,0.25)', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 15, fontWeight: 'bold', cursor: prevBlob && count < MAX ? 'pointer' : 'not-allowed', marginBottom: 4, fontFamily: F }}>
+        {/* Step 2 — Generate */}
+        <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 5px' }}>
+          ② Skizze erstellen
+        </p>
+        <button
+          onClick={generate}
+          disabled={!prevBlob || loading || count >= MAX}
+          style={{
+            width: '100%', padding: '12px 0',
+            background: prevBlob && count < MAX ? '#fff' : 'rgba(255,255,255,0.25)',
+            color: '#1a1a1a', border: 'none', borderRadius: BR,
+            fontSize: 15, fontWeight: 'bold',
+            cursor: prevBlob && count < MAX ? 'pointer' : 'not-allowed',
+            marginBottom: 4, fontFamily: F,
+          }}>
           {t.generate}
         </button>
-        {count >= MAX && <p style={{ color: D.error, textAlign: 'center', fontSize: 11, margin: '4px 0' }}>{t.limitMsg(MAX)}</p>}
-        {error && <p style={{ color: D.error, textAlign: 'center', fontSize: 11, margin: '4px 0' }}>{error}</p>}
+        {count >= MAX && (
+          <p style={{ color: D.error, textAlign: 'center', fontSize: 11, margin: '4px 0' }}>
+            {t.limitMsg()}
+          </p>
+        )}
+        {error && (
+          <p style={{ color: D.error, textAlign: 'center', fontSize: 11, margin: '4px 0' }}>
+            {error}
+          </p>
+        )}
 
         {/* Step 3 — Result */}
         {result && (
           <div style={{ marginTop: 14 }}>
-            <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 8px' }}>③ Deine Skizze</p>
+            <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 8px' }}>
+              ③ Deine Skizze
+            </p>
 
             {/* Khung tranh */}
             <div style={{ boxShadow: '0 8px 28px rgba(0,0,0,0.45)', borderRadius: 2, marginBottom: 14 }}>
@@ -295,7 +375,11 @@ export default function App() {
             </div>
 
             {/* Thông điệp mua */}
-            <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 12px', textAlign: 'center', border: `1px solid rgba(255,255,255,0.12)` }}>
+            <div style={{
+              background: 'rgba(255,255,255,0.08)', borderRadius: 8,
+              padding: '10px 12px', textAlign: 'center',
+              border: `1px solid rgba(255,255,255,0.12)`,
+            }}>
               <p style={{ margin: 0, fontSize: 12, color: D.text, lineHeight: 1.6 }}>
                 {lang === 'de'
                   ? '🎨 Zufrieden mit dieser Skizze? Klicke auf den Warenkorb — du erhältst dein Poster in wenigen Tagen.'
@@ -308,8 +392,15 @@ export default function App() {
 
         {/* History */}
         {hist.length > 0 && (
-          <button onClick={() => setShowHist(true)}
-            style={{ width: '100%', padding: '9px 0', background: 'transparent', color: D.textDim, border: `1px solid rgba(255,255,255,0.12)`, borderRadius: BR, fontSize: 12, cursor: 'pointer', fontFamily: F, marginTop: 12 }}>
+          <button
+            onClick={() => setShowHist(true)}
+            style={{
+              width: '100%', padding: '9px 0',
+              background: 'transparent', color: D.textDim,
+              border: `1px solid rgba(255,255,255,0.12)`,
+              borderRadius: BR, fontSize: 12, cursor: 'pointer',
+              fontFamily: F, marginTop: 12,
+            }}>
             {t.history(hist.length)}
           </button>
         )}
