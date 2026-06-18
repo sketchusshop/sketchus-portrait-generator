@@ -3,8 +3,8 @@ import Cropper from 'react-easy-crop';
 import { SHOP_CONFIG, DESIGN, LANG } from '../config';
 
 const D = DESIGN;
-const HIST_KEY = 'sk_hist_v7';
-const RATIO = 297 / 210; // Chỉ ngang A4
+const HIST_KEY = 'sk_hist_v8';
+const RATIO = 297 / 210;
 
 function getLang() {
   if (typeof window === 'undefined') return 'de';
@@ -21,6 +21,15 @@ function addHist(item) {
   try {
     const h = getHist(); h.unshift(item);
     localStorage.setItem(HIST_KEY, JSON.stringify(h.slice(0, 5)));
+  } catch {}
+}
+
+// Lưu link ảnh mới nhất — theme Shopify sẽ đọc
+function savePortraitUrl(url) {
+  try {
+    localStorage.setItem('sk_portrait_url', url);
+    // Gửi postMessage lên parent (trang Shopify)
+    window.parent.postMessage({ type: 'PORTRAIT_URL', url }, '*');
   } catch {}
 }
 
@@ -45,40 +54,22 @@ function toB64(blob) {
   });
 }
 
-function LoadingScreen({ bg, t }) {
-  const [pct, setPct] = useState(0);
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    const tick = 250, inc = (tick / SHOP_CONFIG.estimatedMs) * 100;
-    const id = setInterval(() => setPct(p => {
-      const n = Math.min(p + inc, 95);
-      setStep(n < 25 ? 0 : n < 55 ? 1 : n < 80 ? 2 : 3);
-      return n;
-    }), tick);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#636363', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      {bg && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(20px) brightness(0.25)', transform: 'scale(1.1)' }} />}
-      <div style={{ position: 'relative', width: '88%', maxWidth: 340, textAlign: 'center', color: '#fff', fontFamily: D.font }}>
-        <p style={{ fontSize: 10, letterSpacing: 3, color: D.textDim, textTransform: 'uppercase', marginBottom: 10 }}>WIRD ERSTELLT</p>
-        <h2 style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 20 }}>{t.loadingSteps[step]}…</h2>
-        <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 24, overflow: 'hidden' }}>
-          <div style={{ height: '100%', background: '#fff', width: `${pct}%`, transition: 'width 0.25s', borderRadius: 99 }} />
-        </div>
-        {t.loadingSteps.map((s, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, textAlign: 'left' }}>
-            <span style={{ width: 18, textAlign: 'center', fontSize: 12, color: i <= step ? '#fff' : 'rgba(255,255,255,0.2)' }}>
-              {i < step ? '✓' : i === step ? '●' : '○'}
-            </span>
-            <span style={{ fontSize: 13, color: i === step ? '#fff' : i < step ? D.textMuted : 'rgba(255,255,255,0.2)', fontWeight: i === step ? 'bold' : 'normal' }}>{s}</span>
-          </div>
-        ))}
-        <p style={{ fontSize: 12, color: D.textDim, marginTop: 20, lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 16 }}>{t.loadingNote}</p>
-      </div>
-    </div>
-  );
+// Download trực tiếp — không mở tab mới
+async function downloadDirect(url, filename) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || 'portrait-sketchus.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  } catch {
+    // Fallback nếu CORS chặn
+    window.open(url, '_blank');
+  }
 }
 
 export default function App() {
@@ -95,11 +86,11 @@ export default function App() {
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [cartLoading, setCartLoading] = useState(false);
   const [error, setError] = useState(null);
   const [count, setCount] = useState(0);
   const [hist, setHist] = useState([]);
   const [showHist, setShowHist] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const MAX = SHOP_CONFIG.maxPreviews;
 
@@ -134,27 +125,10 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || t.errGeneric);
       const item = { previewUrl: data.previewUrl, storedUrl: data.storedUrl, createdAt: new Date().toLocaleString('de-DE') };
       addHist(item); setHist(getHist()); setResult(item); setCount(c => c + 1);
+      // Lưu link để theme Shopify đọc
+      savePortraitUrl(data.storedUrl);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
-  }
-
-  async function addToCart(item) {
-    setCartLoading(true); setError(null);
-    try {
-      const res = await fetch('/api/cart-add', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variantId: SHOP_CONFIG.variantId, portraitUrl: item.storedUrl }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t.cartErr);
-      window.top.location.href = data.checkoutUrl;
-    } catch (e) { setError(e.message); setCartLoading(false); }
-  }
-
-  function downloadImg(url) {
-    const a = document.createElement('a');
-    a.href = url; a.download = 'portrait-sketchus.jpg';
-    a.target = '_blank'; a.click();
   }
 
   function reset() {
@@ -166,64 +140,50 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', background: D.bg, fontFamily: F, color: D.text, boxSizing: 'border-box' }}>
-      {loading && <LoadingScreen bg={prevSrc} t={t} />}
 
-      {/* ── Crop Modal — popup nhỏ gọn, không full screen ── */}
+      {/* ── Loading — ô nhỏ giữa màn hình, không che hết ── */}
+      {loading && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+        }}>
+          <LoadingCard t={t} bg={prevSrc} />
+        </div>
+      )}
+
+      {/* ── Crop Modal — popup nhỏ ── */}
       {showCrop && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1000,
-          background: 'rgba(0,0,0,0.7)',
+          background: 'rgba(0,0,0,0.65)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '60px 16px', // padding top/bottom tránh icon
+          padding: '80px 16px 80px',
           boxSizing: 'border-box',
         }}>
           <div style={{
             background: '#fff', borderRadius: 16,
-            width: '100%', maxWidth: 420,
-            overflow: 'hidden',
-            display: 'flex', flexDirection: 'column',
-            maxHeight: '80vh',
+            width: '100%', maxWidth: 400,
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
           }}>
-            {/* Header */}
             <div style={{ padding: '14px 16px', borderBottom: '1px solid #eee', flexShrink: 0 }}>
               <p style={{ margin: 0, fontWeight: 'bold', fontSize: 16, color: '#1a1a1a', textAlign: 'center' }}>
                 {t.cropTitle}
               </p>
             </div>
-
-            {/* Crop area — vuông vức, không tràn */}
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', background: '#333', flexShrink: 0 }}>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', background: '#333', flexShrink: 0 }}>
               <Cropper
-                image={rawSrc}
-                crop={crop}
-                zoom={zoom}
-                aspect={RATIO}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={onCropDone}
-                showGrid={true}
-                style={{
-                  containerStyle: { position: 'absolute', inset: 0 },
-                }}
+                image={rawSrc} crop={crop} zoom={zoom} aspect={RATIO}
+                onCropChange={setCrop} onZoomChange={setZoom} onCropComplete={onCropDone}
+                style={{ containerStyle: { position: 'absolute', inset: 0 } }}
               />
             </div>
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', gap: 0, flexShrink: 0 }}>
-              <button onClick={cancelCrop} style={{
-                flex: 1, padding: '16px 0', background: '#f5f5f5', color: '#666',
-                border: 'none', borderTop: '1px solid #eee',
-                fontSize: 15, cursor: 'pointer', fontFamily: F,
-                borderBottomLeftRadius: 16,
-              }}>
+            <div style={{ display: 'flex', flexShrink: 0 }}>
+              <button onClick={cancelCrop} style={{ flex: 1, padding: '16px 0', background: '#f5f5f5', color: '#666', border: 'none', borderTop: '1px solid #eee', fontSize: 15, cursor: 'pointer', fontFamily: F, borderBottomLeftRadius: 16 }}>
                 {t.cropCancel}
               </button>
-              <button onClick={saveCrop} style={{
-                flex: 1, padding: '16px 0', background: '#1a1a1a', color: '#fff',
-                border: 'none', borderTop: '1px solid #eee',
-                fontSize: 15, fontWeight: 'bold', cursor: 'pointer', fontFamily: F,
-                borderBottomRightRadius: 16,
-              }}>
+              <button onClick={saveCrop} style={{ flex: 1, padding: '16px 0', background: '#1a1a1a', color: '#fff', border: 'none', borderTop: '1px solid #eee', fontSize: 15, fontWeight: 'bold', cursor: 'pointer', fontFamily: F, borderBottomRightRadius: 16 }}>
                 {t.cropSave}
               </button>
             </div>
@@ -241,21 +201,16 @@ export default function App() {
           <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
             {hist.map((item, i) => (
               <div key={i} style={{ marginBottom: 16, border: `1px solid ${D.border}`, borderRadius: 10, overflow: 'hidden' }}>
-                <div style={{ border: '8px solid #2a2a2a', background: '#fff', lineHeight: 0 }}>
-                  <img src={item.previewUrl} alt="" style={{ width: '100%', display: 'block' }} />
-                </div>
+                <img src={item.previewUrl} alt="" style={{ width: '100%', display: 'block' }} />
                 <div style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.15)' }}>
                   <p style={{ color: D.textDim, fontSize: 11, margin: '0 0 10px' }}>#{hist.length - i} · {item.createdAt}</p>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => { setResult(item); setShowHist(false); }}
-                      style={{ flex: 1, padding: '11px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
-                      {t.historySelect}
-                    </button>
-                    <button onClick={() => { setShowHist(false); addToCart(item); }}
-                      style={{ flex: 1, padding: '11px 0', background: 'transparent', color: D.text, border: `1px solid ${D.border}`, borderRadius: BR, fontSize: 13, cursor: 'pointer' }}>
-                      {t.addToCart}
-                    </button>
-                  </div>
+                  <button onClick={() => {
+                    setResult(item);
+                    savePortraitUrl(item.storedUrl);
+                    setShowHist(false);
+                  }} style={{ width: '100%', padding: '11px 0', background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 14, fontWeight: 'bold', cursor: 'pointer' }}>
+                    {t.historySelect}
+                  </button>
                 </div>
               </div>
             ))}
@@ -269,7 +224,7 @@ export default function App() {
         <p style={{ fontSize: 13, color: D.textMuted, textAlign: 'center', marginBottom: 4, lineHeight: 1.5 }}>{t.sub}</p>
         <p style={{ fontSize: 12, color: D.textDim, textAlign: 'center', marginBottom: 24 }}>{t.counter(count, MAX)}</p>
 
-        {/* Step 1 — Upload */}
+        {/* Step 1 */}
         <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 8 }}>① Foto hochladen</p>
         <label style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(0,0,0,0.15)', border: `1px solid ${D.border}`, borderRadius: 10, padding: 12, cursor: 'pointer', marginBottom: 20 }}>
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} style={{ display: 'none' }} />
@@ -283,7 +238,7 @@ export default function App() {
           </div>
         </label>
 
-        {/* Step 2 — Generate */}
+        {/* Step 2 */}
         <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 8 }}>② Vorschau erstellen</p>
         <button onClick={generate} disabled={!prevBlob || loading || count >= MAX}
           style={{ width: '100%', padding: '15px 0', background: prevBlob && count < MAX ? '#fff' : 'rgba(255,255,255,0.25)', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 16, fontWeight: 'bold', cursor: prevBlob && count < MAX ? 'pointer' : 'not-allowed', marginBottom: 8, fontFamily: F }}>
@@ -297,44 +252,75 @@ export default function App() {
           <div style={{ marginTop: 24 }}>
             <p style={{ fontSize: 11, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', marginBottom: 12 }}>③ Dein Portrait</p>
 
-            {/* Khung ảnh ngang */}
+            {/* Khung tranh thật — 4 cạnh đều nhau */}
             <div style={{ position: 'relative', marginBottom: 12 }}>
+              {/* Shadow ngoài */}
               <div style={{
-                padding: '20px 14px',
-                background: '#1a1a1a',
-                borderRadius: 6,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
+                borderRadius: 2,
+                display: 'inline-block',
+                width: '100%',
               }}>
-                <div style={{ padding: 6, background: '#f5f0e8', lineHeight: 0 }}>
-                  <img src={result.previewUrl} alt="Portrait" style={{ width: '100%', display: 'block' }} />
+                {/* Khung gỗ — 4 cạnh đều 18px */}
+                <div style={{
+                  padding: 18,
+                  background: 'linear-gradient(135deg, #3a2a1a 0%, #5a3e28 25%, #4a3020 50%, #6b4c30 75%, #3a2a1a 100%)',
+                  borderRadius: 2,
+                }}>
+                  {/* Passepartout trắng ngà — 4 cạnh đều 12px */}
+                  <div style={{
+                    padding: 12,
+                    background: '#f8f4ed',
+                    boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.15)',
+                  }}>
+                    {/* Ảnh */}
+                    <img src={result.previewUrl} alt="Portrait"
+                      style={{ width: '100%', display: 'block', lineHeight: 0 }} />
+                  </div>
                 </div>
               </div>
 
-              {/* Nút tải góc trên phải */}
-              <button onClick={() => downloadImg(result.storedUrl)} style={{
-                position: 'absolute', top: 8, right: 8,
-                padding: '7px 12px', fontSize: 12, fontWeight: 'bold',
-                background: 'rgba(0,0,0,0.75)', color: '#fff',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: 6, cursor: 'pointer',
-              }}>
-                {t.download}
+              {/* Nút download góc trên phải — trong khung */}
+              <button
+                onClick={async () => {
+                  setDownloading(true);
+                  await downloadDirect(result.storedUrl, 'portrait-sketchus.jpg');
+                  setDownloading(false);
+                }}
+                disabled={downloading}
+                style={{
+                  position: 'absolute', top: 26, right: 26,
+                  padding: '7px 12px', fontSize: 12, fontWeight: 'bold',
+                  background: 'rgba(0,0,0,0.75)', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  borderRadius: 6, cursor: 'pointer',
+                  backdropFilter: 'blur(4px)',
+                }}
+              >
+                {downloading ? '…' : '⬇ ' + t.download}
               </button>
             </div>
 
-            <p style={{ fontSize: 11, color: D.textDim, textAlign: 'center', marginBottom: 16 }}>{result.createdAt}</p>
-
-            {/* Nút In den Warenkorb */}
-            <button onClick={() => addToCart(result)} disabled={cartLoading}
-              style={{ width: '100%', padding: '15px 0', background: cartLoading ? 'rgba(255,255,255,0.5)' : '#fff', color: '#1a1a1a', border: 'none', borderRadius: BR, fontSize: 16, fontWeight: 'bold', cursor: cartLoading ? 'not-allowed' : 'pointer', marginBottom: 10, fontFamily: F }}>
-              {cartLoading ? t.addingToCart : t.addToCart}
-            </button>
+            {/* Text thay ngày tháng */}
+            <p style={{ fontSize: 12, color: D.textDim, textAlign: 'center', marginBottom: 20 }}>
+              {lang === 'de' ? '💾 Speichere dieses Bild auf deinem Gerät' : '💾 Save this image to your device'}
+            </p>
 
             {/* Nút tạo lại */}
             <button onClick={reset}
-              style={{ width: '100%', padding: '13px 0', background: 'transparent', color: D.text, border: `1px solid ${D.border}`, borderRadius: BR, fontSize: 15, cursor: 'pointer', marginBottom: 16, fontFamily: F }}>
+              style={{ width: '100%', padding: '13px 0', background: 'rgba(255,255,255,0.1)', color: D.text, border: `1px solid ${D.border}`, borderRadius: BR, fontSize: 14, cursor: 'pointer', marginBottom: 16, fontFamily: F }}>
               {t.regenerate}
             </button>
+
+            {/* Thông báo dùng nút Shopify */}
+            <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '14px 16px', textAlign: 'center', marginBottom: 16, border: `1px solid ${D.border}` }}>
+              <p style={{ margin: 0, fontSize: 14, color: D.text, lineHeight: 1.6 }}>
+                {lang === 'de'
+                  ? '👆 Scrolle nach oben und klicke auf "In den Warenkorb" — dein Portrait-Link wird automatisch mitgeschickt!'
+                  : '👆 Scroll up and click "Add to Cart" — your portrait link will be included automatically!'
+                }
+              </p>
+            </div>
 
             {/* Upsell */}
             <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
@@ -355,6 +341,54 @@ export default function App() {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// Loading card nhỏ — không che hết màn hình
+function LoadingCard({ t, bg }) {
+  const [pct, setPct] = useState(0);
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const tick = 250, inc = (tick / SHOP_CONFIG.estimatedMs) * 100;
+    const id = setInterval(() => setPct(p => {
+      const n = Math.min(p + inc, 95);
+      setStep(n < 25 ? 0 : n < 55 ? 1 : n < 80 ? 2 : 3);
+      return n;
+    }), tick);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div style={{
+      background: 'rgba(40,40,40,0.97)',
+      borderRadius: 16,
+      padding: '24px 20px',
+      width: '100%',
+      maxWidth: 320,
+      textAlign: 'center',
+      color: '#fff',
+      fontFamily: DESIGN.font,
+      boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+    }}>
+      {bg && (
+        <div style={{ width: 56, height: 56, borderRadius: 8, overflow: 'hidden', margin: '0 auto 16px', flexShrink: 0 }}>
+          <img src={bg} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+      )}
+      <p style={{ fontSize: 10, letterSpacing: 3, color: '#aaa', textTransform: 'uppercase', marginBottom: 8 }}>WIRD ERSTELLT</p>
+      <p style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 16 }}>{t.loadingSteps[step]}…</p>
+      <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 99, height: 4, marginBottom: 16, overflow: 'hidden' }}>
+        <div style={{ height: '100%', background: '#fff', width: `${pct}%`, transition: 'width 0.25s', borderRadius: 99 }} />
+      </div>
+      {t.loadingSteps.map((s, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, textAlign: 'left' }}>
+          <span style={{ width: 16, textAlign: 'center', fontSize: 11, color: i <= step ? '#fff' : 'rgba(255,255,255,0.2)', flexShrink: 0 }}>
+            {i < step ? '✓' : i === step ? '●' : '○'}
+          </span>
+          <span style={{ fontSize: 12, color: i === step ? '#fff' : i < step ? '#aaa' : 'rgba(255,255,255,0.2)', fontWeight: i === step ? 'bold' : 'normal' }}>{s}</span>
+        </div>
+      ))}
     </div>
   );
 }
