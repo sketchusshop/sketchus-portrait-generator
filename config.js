@@ -18,11 +18,15 @@ export const DESIGN = {
 };
 
 export const AI_PROMPT = `
-Keep the uploaded photo identity exactly. Do not change or redraw any face. Same eyes, nose, mouth, expression, angle and proportions.
+This is a photo-to-pencil filter conversion, not a new portrait generation.
 
-Only convert the image to a high-contrast black-and-white graphite pencil look. Increase strong light/dark contrast. Keep the face structure from the original photo.
+Do not redraw the face. Do not change identity. Preserve the original face, eyes, nose, mouth, expression, gaze, angle, proportions, hairstyle, and all facial details exactly.
 
-Simplify the background into soft pencil/charcoal paper shading. No new face, no beautifying, no added details, no text.
+Only transform the photo into a high-contrast black-and-white graphite pencil look. Add stronger dark shadows, bright paper highlights, visible pencil grain, and handmade sketch texture.
+
+Simplify only the background and secondary areas. Replace the background with soft charcoal shading on textured white paper.
+
+No new face, no beautifying, no added features, no text, no logo, no watermark.
 `;
 
 export const LANG = {
