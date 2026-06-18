@@ -18,7 +18,7 @@ export const DESIGN = {
   btn: 4,
 };
 
-export const AI_PROMPT = `Convert this photo into a highly detailed pencil sketch portrait. Black and white, hand-drawn pencil drawing style, fine pencil strokes, hatching and cross-hatching shading, realistic facial features, pure pencil on white paper. No color.`;
+export const AI_PROMPT = `Create a handmade graphite and charcoal portrait from the uploaded photo. Preserve the exact face identity, face shape, head angle, gaze, expression, age, hairstyle, and distinctive features. Do not change or beautify any face. Make the portrait look clearly hand-drawn, not photo-like: visible pencil strokes, rough charcoal texture, grainy shading, strong dark blacks, bright paper highlights, bold contrast, expressive hand shading. Focus detail on the face, eyes, nose, mouth, and important identity features. Simplify clothing, hair masses, background, and small details with loose sketch lines and soft unfinished edges. Remove the original background. Add a light paper background with rough charcoal shadows and airy empty space. Style: traditional charcoal and graphite drawing on textured white paper, dramatic light and shadow, natural hand pressure, sketchy edges, not smooth, not polished, not digital filter, not photorealistic. No text, logo, watermark, or signature.;
 
 export const LANG = {
   de: {
