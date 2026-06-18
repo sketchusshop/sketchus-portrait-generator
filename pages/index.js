@@ -133,6 +133,16 @@ export default function App() {
   const MAX = SHOP_CONFIG.maxPreviews;
 
   useEffect(() => { setHist(getHist()); }, []);
+// Thêm function này vào App()
+function sendHeight() {
+  const h = document.body.scrollHeight;
+  window.parent.postMessage({ type: 'IFRAME_HEIGHT', height: h }, '*');
+}
+
+// Thêm useEffect này
+useEffect(() => {
+  sendHeight();
+}, [result, loading, showCrop, showHist, prevSrc]);
 
   function handleFile(e) {
     const f = e.target.files?.[0]; if (!f) return;
