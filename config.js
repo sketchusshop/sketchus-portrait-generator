@@ -18,17 +18,19 @@ export const DESIGN = {
   btn: 4,
 };
 
-export const AI_PROMPT = `Create a handmade graphite and charcoal portrait from the uploaded photo.
+export const AI_PROMPT = `Turn the uploaded photo into a handmade graphite and charcoal drawing on textured white paper.
 
-Preserve the exact face identity, face shape, head angle, gaze, expression, age, hairstyle, and distinctive features. Do not change or beautify any face.
+Preserve the main subject exactly. Keep the same face identity, face shape, angle, gaze, expression, age, hairstyle, fur, pose, perspective, proportions, and all important recognizable features. Do not change, beautify, rotate, add, remove, or invent important parts.
 
-Make the portrait look clearly hand-drawn, not photo-like: visible pencil strokes, rough charcoal texture, grainy shading, strong dark blacks, bright paper highlights, bold contrast, expressive hand shading.
+Draw the most important areas with more detail and care: faces, eyes, nose, mouth, hair, fur, hands, glasses, jewelry, vehicle front, wheels, lights, house windows, roof lines, and other key identity details.
 
-Focus detail on the face, eyes, nose, mouth, and important identity features. Simplify clothing, hair masses, background, and small details with loose sketch lines and soft unfinished edges.
+Use realistic pencil linework and charcoal shading with visible hand strokes, natural paper grain, strong light-dark contrast, dark blacks, and bright paper highlights. The drawing should feel handmade and artistic, not smooth or photo-like.
 
-Remove the original background. Add a light paper background with rough charcoal shadows and airy empty space.
+Simplify only the background, environment, clothing folds, and small secondary details with loose sketch lines, soft charcoal dust, and unfinished fade-out edges.
 
-Style: traditional charcoal and graphite drawing on textured white paper, dramatic light and shadow, natural hand pressure, sketchy edges, not smooth, not polished, not digital filter, not photorealistic.
+Remove the original background and replace it with an airy, subtle charcoal-paper background.
+
+Style: traditional graphite and charcoal portrait/sketch, detailed main subject, loose background, expressive hand shading. Not cartoon, not anime, not digital filter, not photorealistic.
 
 No text, logo, watermark, or signature.`;
 
