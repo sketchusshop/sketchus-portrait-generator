@@ -352,14 +352,7 @@ useEffect(() => {
               </p>
             </div>
 
-            {/* Upsell */}
-            <div style={{ background: 'rgba(0,0,0,0.12)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
-              <p style={{ fontSize: 11, color: D.textMuted, margin: '0 0 5px', lineHeight: 1.5 }}>{t.upsell}</p>
-              <span onClick={() => window.top.location.href = SHOP_CONFIG.originalPortraitUrl}
-                style={{ fontSize: 12, color: D.text, fontWeight: 'bold', textDecoration: 'underline', cursor: 'pointer' }}>
-                {t.upsellLink}
-              </span>
-            </div>
+            
           </div>
         )}
 
