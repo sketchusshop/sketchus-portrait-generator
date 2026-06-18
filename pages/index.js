@@ -28,9 +28,12 @@ function addHist(item) {
 function savePortraitUrl(url) {
   try {
     localStorage.setItem('sk_portrait_url', url);
-    window.parent.postMessage({ type: 'PORTRAIT_URL', url }, '*');
-  } catch {}
+    // Gửi lên parent Shopify
+    window.parent.postMessage({ type: 'PORTRAIT_URL', url: url }, '*');
+    console.log('Portrait URL sent:', url);
+  } catch(e) { console.error(e); }
 }
+
 
 function sendHeight() {
   try {
