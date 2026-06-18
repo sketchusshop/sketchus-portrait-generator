@@ -284,12 +284,14 @@ export default function App() {
         </div>
       )}
 
-      {/* Main */}
-      <div style={{ padding: '10px 12px 20px', maxWidth: 480, margin: '0 auto' }}>
+   {/* Main — padding tối thiểu */}
+<div style={{ padding: '6px 12px 16px', maxWidth: 480, margin: '0 auto' }}>
 
-        <h1 style={{ fontSize: 16, fontWeight: 'bold', textAlign: 'center', margin: '0 0 2px' }}>{t.title}</h1>
-        <p style={{ fontSize: 11, color: D.textMuted, textAlign: 'center', margin: '0 0 2px', lineHeight: 1.4 }}>{t.sub}</p>
-        <p style={{ fontSize: 10, color: D.textDim, textAlign: 'center', margin: '0 0 12px' }}>{t.counter(count, MAX)}</p>
+  {/* Header cực nhỏ */}
+  <h1 style={{ fontSize: 15, fontWeight: 'bold', textAlign: 'center', margin: '0 0 1px' }}>{t.title}</h1>
+  <p style={{ fontSize: 11, color: D.textMuted, textAlign: 'center', margin: '0 0 1px', lineHeight: 1.3 }}>{t.sub}</p>
+  <p style={{ fontSize: 10, color: D.textDim, textAlign: 'center', margin: '0 0 10px' }}>{t.counter(count, MAX)}</p>
+
 
         {/* Step 1 */}
         <p style={{ fontSize: 10, letterSpacing: 2, color: D.textDim, textTransform: 'uppercase', margin: '0 0 5px' }}>① Foto hochladen</p>
