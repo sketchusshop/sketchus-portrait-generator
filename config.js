@@ -18,21 +18,21 @@ export const DESIGN = {
   btn: 4,
 };
 
-export const AI_PROMPT = `Turn the uploaded photo into a handmade graphite and charcoal drawing on textured white paper.
+export const AI_PROMPT = `
+Convert the uploaded photo into a handmade graphite and charcoal sketch while preserving the original subject as closely as possible.
 
-Preserve the main subject exactly. Keep the same face identity, face shape, angle, gaze, expression, age, hairstyle, fur, pose, perspective, proportions, and all important recognizable features. Do not change, beautify, rotate, add, remove, or invent important parts.
+Do not redesign the person, animal, house, car, motorcycle, or object. Keep the same face, identity, expression, gaze, angle, pose, proportions, perspective, silhouette, and all important recognizable features.
 
-Draw the most important areas with more detail and care: faces, eyes, nose, mouth, hair, fur, hands, glasses, jewelry, vehicle front, wheels, lights, house windows, roof lines, and other key identity details.
+For people and animals, facial likeness is the top priority. The face must remain recognizably the same person or animal from the uploaded photo.
 
-Use realistic pencil linework and charcoal shading with visible hand strokes, natural paper grain, strong light-dark contrast, dark blacks, and bright paper highlights. The drawing should feel handmade and artistic, not smooth or photo-like.
+Add detail only to important subject areas: face, eyes, mouth, hair, fur, hands, glasses, vehicle front, wheels, lights, house windows, roof lines, and other key details.
 
-Simplify only the background, environment, clothing folds, and small secondary details with loose sketch lines, soft charcoal dust, and unfinished fade-out edges.
+Simplify only the background and secondary details. Use visible pencil strokes, charcoal grain, strong black-white contrast, textured paper, and airy fade-out edges.
 
-Remove the original background and replace it with an airy, subtle charcoal-paper background.
+The result should look like a real graphite and charcoal drawing, not a new person, not photorealistic, not smooth, not cartoon, not a digital filter.
 
-Style: traditional graphite and charcoal portrait/sketch, detailed main subject, loose background, expressive hand shading. Not cartoon, not anime, not digital filter, not photorealistic.
-
-No text, logo, watermark, or signature.`;
+No text, logo, watermark, or signature.
+`;
 
 export const LANG = {
   de: {
