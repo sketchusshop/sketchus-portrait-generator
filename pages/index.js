@@ -37,10 +37,15 @@ function savePortraitUrl(url) {
 
 function sendHeight() {
   try {
-    const h = document.documentElement.scrollHeight || document.body.scrollHeight;
+    var h = Math.max(
+      document.body.scrollHeight,
+      document.body.offsetHeight,
+      document.documentElement.scrollHeight
+    );
     window.parent.postMessage({ type: 'IFRAME_HEIGHT', height: h }, '*');
-  } catch {}
+  } catch(e) {}
 }
+
 
 function cropImg(src, px) {
   return new Promise(res => {
