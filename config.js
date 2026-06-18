@@ -18,17 +18,15 @@ export const DESIGN = {
 };
 
 export const AI_PROMPT = `
-Convert the uploaded photo into a handmade graphite and charcoal sketch while preserving the original subject as closely as possible.
+Convert the uploaded photo into a graphite and charcoal sketch. Preserve the original face 1:1. Do not redraw, reinterpret, beautify, stylize, rotate, reshape, or change the face in any way.
 
-Do not redesign the person, animal, house, car, motorcycle, or object. Keep the same face, identity, expression, gaze, angle, pose, proportions, perspective, silhouette, and all important recognizable features.
+The person or animal must remain exactly recognizable as the same subject from the uploaded photo. Keep the same eyes, nose, mouth, jawline, cheeks, head angle, gaze, expression, age, hairstyle, fur, glasses, and all identity features.
 
-For people and animals, facial likeness is the top priority. The face must remain recognizably the same person or animal from the uploaded photo.
+This is not a new portrait. This is a sketch conversion of the original photo.
 
-Add detail only to important subject areas: face, eyes, mouth, hair, fur, hands, glasses, vehicle front, wheels, lights, house windows, roof lines, and other key details.
+Only transform the visual texture into pencil and charcoal: visible graphite lines, charcoal grain, stronger black-white contrast, paper texture, and handmade shading.
 
-Simplify only the background and secondary details. Use visible pencil strokes, charcoal grain, strong black-white contrast, textured paper, and airy fade-out edges.
-
-The result should look like a real graphite and charcoal drawing, not a new person, not photorealistic, not smooth, not cartoon, not a digital filter.
+Simplify only the background and secondary details. Keep the face, expression, and identity unchanged.
 
 No text, logo, watermark, or signature.
 `;
