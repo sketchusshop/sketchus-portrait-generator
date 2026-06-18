@@ -18,17 +18,17 @@ export const DESIGN = {
 };
 
 export const AI_PROMPT = `
-Convert the uploaded photo into a graphite and charcoal sketch. Preserve the original face 1:1. Do not redraw, reinterpret, beautify, stylize, rotate, reshape, or change the face in any way.
+Convert the uploaded photo into a graphite pencil and charcoal sketch effect.
 
-The person or animal must remain exactly recognizable as the same subject from the uploaded photo. Keep the same eyes, nose, mouth, jawline, cheeks, head angle, gaze, expression, age, hairstyle, fur, glasses, and all identity features.
+Do not redraw the face or main subject. Do not create a new person or animal. Preserve the original facial geometry, eyes, nose, mouth, expression, gaze, angle, proportions, and identity exactly.
 
-This is not a new portrait. This is a sketch conversion of the original photo.
+Apply a realistic graphite pencil filter to the face and key identity details so the subject stays recognizable. Use charcoal texture only for background, clothing, body, and secondary details.
 
-Only transform the visual texture into pencil and charcoal: visible graphite lines, charcoal grain, stronger black-white contrast, paper texture, and handmade shading.
+Simplify or remove the original background and replace it with soft airy charcoal shading on textured white paper.
 
-Simplify only the background and secondary details. Keep the face, expression, and identity unchanged.
+This must look like a pencil-and-charcoal conversion of the original photo, not a newly generated portrait.
 
-No text, logo, watermark, or signature.
+No beautifying, no face changes, no added details, no text, no logo, no watermark.
 `;
 
 export const LANG = {
